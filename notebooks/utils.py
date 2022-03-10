@@ -1,6 +1,8 @@
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
 
-def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp"):
+def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = None):
     '''with tonic events is loaded in a standardized format: event -> (x,y,t,p) 
        TODO : use tonic function to apply to_timesurface in a clean way.
     '''
@@ -47,6 +49,8 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
         elif decay == "exp":
             timesurface = torch.exp(timestamp_context / tau)
         all_surfaces[index, :, :, :] = timesurface
+        if filtering_threshold:
+            all_surfaces = all_surfaces[[all_surfaces.sum(dim=0)>filtering_threshold], :, :, :]
     return all_surfaces
 
 def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, seed=42):
@@ -66,3 +70,101 @@ def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=Tr
     else:
         loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
     return loader
+
+def get_properties(events, target, ind_sample, values, ordering = 'xytp', distinguish_polarities = False):
+    t_index, p_index = ordering.index('t'), ordering.index('p')
+    if distinguish_polarities: 
+        for polarity in [0,1]:
+            events_pol = events[(events[:, p_index]==polarity)]
+            isi = np.diff(events_pol[:, t_index])
+            if 'mean_isi' in values.keys():
+                values['mean_isi'][polarity, ind_sample, target] = (isi[isi>0]).mean()
+            if 'median_isi' in values.keys():
+                values['median_isi'][polarity, ind_sample, target] = np.median((isi[isi>0]))
+            if 'synchronous_events' in values.keys():
+                values['synchronous_events'][polarity, ind_sample, target] = (isi==0).mean()
+            if 'nb_events' in values.keys():
+                values['nb_events'][polarity, ind_sample, target] = events_pol.shape[0]
+    else:
+        events_pol = events
+        isi = np.diff(events_pol[:, t_index])
+        if 'mean_isi' in values.keys():
+            values['mean_isi'][0, ind_sample, target] = (isi[isi>0]).mean()
+        if 'median_isi' in values.keys():
+            values['median_isi'][0, ind_sample, target] = np.median((isi[isi>0]))
+        if 'synchronous_events' in values.keys():
+            values['synchronous_events'][0, ind_sample, target] = (isi==0).mean()
+        if 'nb_events' in values.keys():
+            values['nb_events'][0, ind_sample, target] = events_pol.shape[0]
+    if 'time' in values.keys():
+        values['time'][0, ind_sample, target] = events[-1,t_index]-events[0,t_index]
+    return values
+
+def get_dataset_info(trainset, testset, properties = ['mean_isi', 'synchronous_events', 'nb_events'], distinguish_labels = False, distinguish_polarities = False):
+    
+    print(f'number of samples in the trainset: {len(trainset)}')
+    print(f'number of samples in the testset: {len(testset)}')
+    print(40*'-')
+    
+    #x_index, y_index, t_index, p_index = trainset.ordering.index("x"), trainset.ordering.index("y"), trainset.ordering.index("t"), trainset.ordering.index("p")
+    nb_class = len(trainset.classes)
+    nb_sample = len(trainset)+len(testset)
+    nb_pola = 2
+    
+    values = {}
+    for name in properties:
+        values.update({name:np.zeros([nb_pola, nb_sample, nb_class])})
+
+    ind_sample = 0
+    num_labels_trainset = np.zeros([nb_class])
+    num_labels_testset = np.zeros([nb_class])
+    
+    loader = get_loader(trainset, shuffle=False)
+    for events, target in loader:
+        events = events.squeeze().numpy()
+        values = get_properties(events, target, ind_sample, values, ordering = trainset.ordering, distinguish_polarities = distinguish_polarities)
+        num_labels_trainset[target] += 1
+        ind_sample += 1
+                
+    loader = get_loader(testset, shuffle=False)
+    for events, target in loader:
+        events = events.squeeze().numpy()
+        values = get_properties(events, target, ind_sample, values, ordering = trainset.ordering, distinguish_polarities = distinguish_polarities)
+        num_labels_testset[target] += 1
+        ind_sample += 1
+        
+    print(f'number of samples in each class for the trainset: {num_labels_trainset}')
+    print(f'number of samples in each class for the testset: {num_labels_testset}')
+    print(40*'-')
+        
+    width_fig = 30
+    fig, axs = plt.subplots(1,len(values.keys()), figsize=(width_fig,width_fig//len(values.keys())))
+    for i, value in enumerate(values.keys()):
+        if distinguish_polarities:
+            x = []
+            for p in range(nb_pola):
+                x.append(values[value][p,:,:].sum(axis=1).ravel())
+            ttl = value
+        elif distinguish_labels:
+            x = []
+            for c in range(nb_class):
+                x.append(values[value][0,np.nonzero(values[value][0,:,c]),c].ravel())
+            ttl = value
+        else:
+            x = []
+            x.append(values[value][0,:,:].sum(axis=1).ravel())
+            ttl = value
+
+        for k in range(len(x)):
+            n, bins, patches = axs[i].hist(x=x[k], bins='auto',
+                                    alpha=.5, rwidth=0.85)
+            
+        axs[i].grid(axis='y', alpha=0.75)
+        axs[i].set_xlabel('Value')
+        axs[i].set_ylabel('Frequency')
+        axs[i].set_title(f'Histogram for the {ttl}')
+        maxfreq = n.max()
+        axs[i].set_ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
+        #axs[i].set_xscale("log")
+        #axs[i].set_yscale("log")
+    return values
