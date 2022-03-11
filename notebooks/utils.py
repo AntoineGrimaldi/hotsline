@@ -2,7 +2,7 @@ import torch, tonic
 import numpy as np
 import matplotlib.pyplot as plt
 
-def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = None):
+def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = None, device="cpu"):
     '''with tonic events is loaded in a standardized format: event -> (x,y,t,p) 
        TODO : use tonic function to apply to_timesurface in a clean way.
     '''
@@ -24,11 +24,11 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
 
     timestamp_memory = torch.zeros(
         (sensor_size[2], sensor_size[1] + radius_y * 2, sensor_size[0] + radius_x * 2)
-    )
+    ).to(device)
     timestamp_memory -= tau * 3 + 1
     all_surfaces = torch.zeros(
         (len(events), sensor_size[2], surface_dimensions[1], surface_dimensions[0])
-    )
+    ).to(device)
     for index, event in enumerate(events):
         x = int(event[x_index])
         y = int(event[y_index])
@@ -177,3 +177,29 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
         #axs[i].set_xscale("log")
         #axs[i].set_yscale("log")
     return values
+
+def plot_kernels(layer, pola, R, width=20):
+    kernel = layer.synapses.weight.data.T
+    fig = plt.figure(figsize=(width,pola/kernel.shape[1]*width))
+    for n in range(len(kernel[0,:])):
+        for p in range(pola):
+            sub = fig.add_subplot(pola,len(kernel[0,:]),n+len(kernel[0,:])*p+1)
+            dico = np.reshape(kernel[p*(2*R+1)**2:(p+1)*(2*R+1)**2,n], [int(np.sqrt(len(kernel)/pola)), int(np.sqrt(len(kernel)/pola))])
+            sub.imshow((dico), cmap=plt.cm.plasma)
+            sub.axes.get_xaxis().set_visible(False)
+            sub.axes.get_yaxis().set_visible(False)
+    plt.show()
+    
+def plot_weight_distribution(layer, bins=np.linspace(0, 1, 50)):
+    kernels = layer.synapses.weight.data
+    fig, axs = plt.subplots(1,2, figsize=(12, 6))
+    n_neurons = kernels.size(dim=0)
+    ts_size = int(kernels.size(dim=1)/2)
+    for k in range (n_neurons):
+        pos_kernels = kernels[k][ts_size:]
+        neg_kernels = kernels[k][:ts_size]
+        axs[0].hist(neg_kernels, bins=bins, alpha=.1)
+        axs[0].set_xlabel('OFF polarities', fontsize=16)
+        axs[1].hist(pos_kernels, bins=bins, alpha=.1)
+        axs[1].set_xlabel('ON polarities', fontsize=16)
+    plt.show()
