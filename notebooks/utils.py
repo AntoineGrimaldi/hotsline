@@ -1,4 +1,4 @@
-import torch
+import torch, tonic
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -49,11 +49,12 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
         elif decay == "exp":
             timesurface = torch.exp(timestamp_context / tau)
         all_surfaces[index, :, :, :] = timesurface
-        if filtering_threshold:
-            all_surfaces = all_surfaces[[all_surfaces.sum(dim=0)>filtering_threshold], :, :, :]
+    if filtering_threshold:
+        indices = torch.nonzero(all_surfaces.sum(dim=(1,2,3))>filtering_threshold).squeeze(1)
+        all_surfaces = all_surfaces[indices, :, :, :]
     return all_surfaces
 
-def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, seed=42):
+def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, batch_size=None, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
     # then the dataset is splitted into different folds with equal repartition of the classes.
     if kfold:
@@ -66,9 +67,15 @@ def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=Tr
         g_cpu = torch.Generator()
         g_cpu.manual_seed(seed)
         subsampler = torch.utils.data.SubsetRandomSampler(subset_indices, g_cpu)
-        loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, sampler=subsampler, num_workers = num_workers)
+        if batch_size:
+            loader = torch.utils.data.DataLoader(dataset, shuffle=False, sampler=subsampler, num_workers = num_workers, batch_size=batch_size, collate_fn=tonic.collation.PadTensors(batch_first=False))
+        else:
+            loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, sampler=subsampler, num_workers = num_workers)
     else:
-        loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
+        if batch_size:
+            loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers, batch_size=batch_size, collate_fn=tonic.collation.PadTensors(batch_first=False))
+        else: 
+            loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
     return loader
 
 def get_properties(events, target, ind_sample, values, ordering = 'xytp', distinguish_polarities = False):
@@ -100,15 +107,16 @@ def get_properties(events, target, ind_sample, values, ordering = 'xytp', distin
         values['time'][0, ind_sample, target] = events[-1,t_index]-events[0,t_index]
     return values
 
-def get_dataset_info(trainset, testset, properties = ['mean_isi', 'synchronous_events', 'nb_events'], distinguish_labels = False, distinguish_polarities = False):
+def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchronous_events', 'nb_events'], distinguish_labels = False, distinguish_polarities = False):
     
     print(f'number of samples in the trainset: {len(trainset)}')
-    print(f'number of samples in the testset: {len(testset)}')
+    if testset: print(f'number of samples in the testset: {len(testset)}')
     print(40*'-')
     
     #x_index, y_index, t_index, p_index = trainset.ordering.index("x"), trainset.ordering.index("y"), trainset.ordering.index("t"), trainset.ordering.index("p")
     nb_class = len(trainset.classes)
-    nb_sample = len(trainset)+len(testset)
+    nb_sample = len(trainset)
+    if testset: nb_sample += len(testset)
     nb_pola = 2
     
     values = {}
@@ -117,7 +125,7 @@ def get_dataset_info(trainset, testset, properties = ['mean_isi', 'synchronous_e
 
     ind_sample = 0
     num_labels_trainset = np.zeros([nb_class])
-    num_labels_testset = np.zeros([nb_class])
+    if testset: num_labels_testset = np.zeros([nb_class])
     
     loader = get_loader(trainset, shuffle=False)
     for events, target in loader:
@@ -125,16 +133,17 @@ def get_dataset_info(trainset, testset, properties = ['mean_isi', 'synchronous_e
         values = get_properties(events, target, ind_sample, values, ordering = trainset.ordering, distinguish_polarities = distinguish_polarities)
         num_labels_trainset[target] += 1
         ind_sample += 1
-                
-    loader = get_loader(testset, shuffle=False)
-    for events, target in loader:
-        events = events.squeeze().numpy()
-        values = get_properties(events, target, ind_sample, values, ordering = trainset.ordering, distinguish_polarities = distinguish_polarities)
-        num_labels_testset[target] += 1
-        ind_sample += 1
+       
+    if testset:
+        loader = get_loader(testset, shuffle=False)
+        for events, target in loader:
+            events = events.squeeze().numpy()
+            values = get_properties(events, target, ind_sample, values, ordering = trainset.ordering, distinguish_polarities = distinguish_polarities)
+            num_labels_testset[target] += 1
+            ind_sample += 1
         
     print(f'number of samples in each class for the trainset: {num_labels_trainset}')
-    print(f'number of samples in each class for the testset: {num_labels_testset}')
+    if testset: print(f'number of samples in each class for the testset: {num_labels_testset}')
     print(40*'-')
         
     width_fig = 30
