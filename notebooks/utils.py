@@ -49,10 +49,11 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
         elif decay == "exp":
             timesurface = torch.exp(timestamp_context / tau)
         all_surfaces[index, :, :, :] = timesurface
+        indices = None
     if filtering_threshold:
         indices = torch.nonzero(all_surfaces.sum(dim=(1,2,3))>filtering_threshold).squeeze(1)
         all_surfaces = all_surfaces[indices, :, :, :]
-    return all_surfaces
+    return all_surfaces, indices
 
 def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, batch_size=None, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
