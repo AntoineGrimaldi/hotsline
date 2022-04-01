@@ -3,7 +3,7 @@ import torch
 class hotslayer(torch.nn.Module):
     def __init__(self, ts_size, n_neurons, homeostasis = True, device="cpu", bias=False):
         super(hotslayer, self).__init__()
-        self.synapses = torch.nn.Linear(ts_size, n_neurons, bias=bias)
+        self.synapses = torch.nn.Linear(ts_size, n_neurons, bias=bias, device=device)
         torch.nn.init.uniform_(self.synapses.weight, a=0, b=1)
         self.cumhisto = torch.ones([n_neurons], device=device)
         self.clustering_flag = True
@@ -14,8 +14,8 @@ class hotslayer(torch.nn.Module):
         gain = torch.exp(lambda_homeo*(1-self.cumhisto.size(dim=0)*self.cumhisto/self.cumhisto.sum()))
         return gain
 
-    def forward(self, all_ts):
-        if self.clustering_flag:
+    def forward(self, all_ts, clustering_flag):
+        if clustering_flag:
             n_star = torch.zeros(all_ts.shape[0])
             for iev in range(len(all_ts)):
                 ts = all_ts[iev].ravel()
