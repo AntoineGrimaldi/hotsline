@@ -2,6 +2,7 @@ from layer import hotslayer
 from tqdm import tqdm
 from timesurface import timesurface
 import numpy as np
+import matplotlib.pyplot as plt
 import torch, os
 import pickle
 
@@ -22,7 +23,6 @@ class network(object):
         
         self.name = f'{timestr}_{dataset_name}_{name}_{homeo}_{nb_neurons}_{tau}_{R}'
         nb_layers = len(nb_neurons)
-        #tau = np.array(tau)*1e3 # to enter tau in ms
         self.n_pola = [nb_neurons[L] for L in range(nb_layers-1)]
         self.n_pola.insert(0,2)
         self.sensor_size = (sensor_size[0], sensor_size[1])
@@ -39,33 +39,58 @@ class network(object):
         else:
             self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             
-    def clustering(self, loader, ordering, filtering_threshold):
-        p_index = ordering.index('p')
-        #torch.set_default_tensor_type("torch.DoubleTensor")
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        with torch.no_grad():
-            for events, target in tqdm(loader):
-                for L in range(len(self.tau)):
-                    all_ts, ind_filtered = timesurface(events.squeeze(0), (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
-                    #network.layers[L].to(device)
-                    n_star = self.layers[L](all_ts, True)
-                    if ind_filtered is not None:
-                        events = events[:,ind_filtered,:]
-                    events[0,:,p_index] = n_star.cpu()
-                    #network.layers[L].to('cpu')
-                    del all_ts
-                    torch.cuda.empty_cache()
+    def clustering(self, loader, ordering, filtering_threshold, stop_indice = None, record = False):
         path = '../Records/networks/'+self.name+'.pkl'
-        with open(path, 'wb') as file:
-            pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
+        if not os.path.exists(path):
+            p_index = ordering.index('p')
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if record:
+                entropy = []
+                loss = []
+                delta_w = []
+                homeostasis = []
+
+            with torch.no_grad():
+                indice = 0
+                for events, target in tqdm(loader):
+                    if record:
+                        previous_dic = [self.layers[L].synapses.weight.data.T.detach().clone() for L in range(len(self.tau))]
+                    for L in range(len(self.tau)):
+                        all_ts, ind_filtered = timesurface(events.squeeze(0), (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
+                        n_star = self.layers[L](all_ts, True)
+                        if ind_filtered is not None:
+                            events = events[:,ind_filtered,:]
+                        if record:
+                            proto_ts = all_ts.detach().clone()
+                            kernels = self.layers[L].synapses.weight.data.T
+                            for ev in range(len(n_star)):
+                                proto_ts[ev,:,:,:] = torch.reshape(kernels[:,int(n_star[ev].cpu())], (self.n_pola[L], 2*self.R[L]+1, 2*self.R[L]+1))
+                                diff = torch.linalg.norm(all_ts-proto_ts)
+                                diff = diff.mean()
+                            loss.append(diff.cpu())
+                            entropy.append(-(kernels*torch.log(kernels)).sum().cpu())
+                            delta_w.append((kernels-previous_dic[L]).abs().mean().cpu())
+                            homeostasis.append((self.layers[L].cumhisto/self.layers[L].cumhisto.sum()-1/kernels.shape[1]).abs().mean().cpu())
+                        events[0,:,p_index] = n_star.cpu()
+                        del all_ts
+                        torch.cuda.empty_cache()
+                        if indice==stop_indice:
+                            break
+                        indice +=1
+
+            with open(path, 'wb') as file:
+                pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
+            if record:
+                path = '../Records/networks/'+self.name+'_recorded_parameters.pkl'
+                with open(path, 'wb') as file:
+                    pickle.dump([loss, entropy, delta_w, homeostasis], file, pickle.HIGHEST_PROTOCOL)
+            
             
     def coding(self, loader, ordering, classes, filtering_threshold, training, jitter=(None,None)):
         for L in range(len(self.tau)):
             self.layers[L].homeo_flag = False
         
         p_index = ordering.index('p')
-        #torch.set_default_tensor_type("torch.DoubleTensor")
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         if training:
@@ -83,13 +108,82 @@ class network(object):
                 for events, target in tqdm(loader):
                     for L in range(len(self.tau)):
                         all_ts, ind_filtered = timesurface(events.squeeze(0), (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
-                        #network.layers[L].to(device)
                         n_star = self.layers[L](all_ts, False)
                         if ind_filtered is not None:
                             events = events[:,ind_filtered,:]
                         events[0,:,p_index] = n_star.cpu()
-                        #network.layers[L].to('cpu')
                         del all_ts
                         torch.cuda.empty_cache()
                     np.save(output_path+f'{classes[target]}/{nb}', events)
                     nb+=1
+                    
+                    
+    def plotlayers(self, maxpol=None, hisiz=2, yhis=0.3):
+        '''
+        '''
+        N = []
+        P = [2]
+        R2 = []
+        kernels = []
+        for L in range(len(self.tau)):
+            kernels.append(self.layers[L].synapses.weight.data.T.cpu().numpy())
+            N.append(int(kernels[L].shape[1]))
+            if L>0:
+                P.append(int(kernels[L-1].shape[1]))
+            R2.append(int(kernels[L].shape[0]/P[L]))
+        if maxpol is None:
+            maxpol=P[-1]
+
+        fig = plt.figure(figsize=(16,9))
+        gs = fig.add_gridspec(np.sum(P)+hisiz, np.sum(N)+len(self.tau)-1, wspace=0.05, hspace=0.05)
+        if self.layers[-1].homeo_flag:
+            fig.suptitle('Activation histograms and associated time surfaces with homeostasis', size=20, y=0.95)
+        else:
+            fig.suptitle('Activation histograms and associated time surfaces for original hots', size=20, y=0.95)
+
+        for L in range(len(self.tau)):
+            ax = fig.add_subplot(gs[:hisiz, int(np.sum(N[:L]))+1*L:int(np.sum(N[:L+1]))+L*1])
+            plt.bar(np.arange(N[L]), (self.layers[L].cumhisto/torch.sum(self.layers[L].cumhisto)).cpu(), width=1, align='edge', ec="k")
+            ax.set_xticks(())
+            ax.set_title('Layer '+str(L+1), fontsize=16)
+            plt.xlim([0,N[L]])
+            yhis = 1.1*max(self.layers[L].cumhisto/torch.sum(self.layers[L].cumhisto)).cpu()
+            plt.ylim([0,yhis])
+
+            for k in range(N[L]):
+                vmaxi = max(kernels[L][:,k])
+                for j in range(P[L]):
+                    if j>maxpol-1:
+                        pass
+                    else:
+                        axi = fig.add_subplot(gs[j+hisiz,k+1*L+int(np.sum(N[:L]))])
+                        krnl = kernels[L][j*R2[L]:(j+1)*R2[L],k].reshape((int(np.sqrt(R2[L])), int(np.sqrt(R2[L]))))
+
+                        axi.imshow(krnl, vmin=0, vmax=vmaxi, cmap=plt.cm.plasma, interpolation='nearest')
+                        axi.set_xticks(())
+                        axi.set_yticks(())
+        plt.show()
+        return fig
+    
+    def plotlearning(self, width_fig = 30):
+        path = '../Records/networks/'+self.name+'_recorded_parameters.pkl'
+        with open(path, 'rb') as file:
+            loss, entropy, delta_w, homeostasis = pickle.load(file)
+            
+        n_layers = len(self.tau)
+        fig, axs = plt.subplots(n_layers,4, figsize=(width_fig,n_layers*width_fig//4))
+        for L in range(n_layers):
+            loss_layer = loss[L::n_layers]
+            entropy_layer = entropy[L::n_layers]
+            delta_w_layer = delta_w[L::n_layers]
+            homeostasis_layer = homeostasis[L::n_layers]
+            axs[L,0].plot(loss_layer)
+            axs[L,1].plot(entropy_layer)
+            axs[L,2].plot(delta_w_layer)
+            axs[L,3].plot(homeostasis_layer)
+            if L == 0:
+                axs[L,0].set_title('average loss')
+                axs[L,1].set_title('average entropy values for the time surfaces')
+                axs[L,2].set_title('average gradient of the weights')
+                axs[L,3].set_title('average homeostasic gain')
+        plt.show()

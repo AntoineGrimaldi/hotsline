@@ -1,30 +1,46 @@
-import torch, tonic
+import torch, tonic, os
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, batch_size=None, seed=42):
+def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
     # then the dataset is splitted into different folds with equal repartition of the classes.
+    
+    classes = dataset.classes
+    targets = dataset.targets
+    
     if kfold:
         subset_indices = []
         subset_size = len(dataset)//kfold
-        for i in range(len(dataset.classes)):
-            all_ind = np.where(np.array(dataset.targets)==i)[0]
-            subset_indices += all_ind[kfold_ind*subset_size//len(dataset.classes):
-                            min((kfold_ind+1)*subset_size//len(dataset.classes), len(dataset)-1)].tolist()
+        for i in range(len(classes)):
+            all_ind = np.where(np.array(targets)==i)[0]
+            subset_indices += all_ind[kfold_ind*subset_size//len(classes):
+                            min((kfold_ind+1)*subset_size//len(classes), len(dataset)-1)].tolist()
         g_cpu = torch.Generator()
         g_cpu.manual_seed(seed)
         subsampler = torch.utils.data.SubsetRandomSampler(subset_indices, g_cpu)
-        if batch_size:
-            loader = torch.utils.data.DataLoader(dataset, shuffle=False, sampler=subsampler, num_workers = num_workers, batch_size=batch_size, collate_fn=tonic.collation.PadTensors(batch_first=False))
-        else:
-            loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, sampler=subsampler, num_workers = num_workers)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, sampler=subsampler, num_workers = num_workers)
     else:
-        if batch_size:
-            loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers, batch_size=batch_size, collate_fn=tonic.collation.PadTensors(batch_first=False))
-        else: 
-            loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
+        loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
     return loader
+
+def get_sliced_loader(dataset, slicing_time_window, dataset_name, only_first = True, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True):
+    
+    classes = dataset.classes
+    targets = dataset.targets
+
+    metadata_path = f'./metadata/{dataset_name}_{int(slicing_time_window*1e-3)}_{only_first}'
+
+    if only_first:
+        slicer = tonic.slicers.SliceAtTimePoints(start_tw = [0], end_tw = [slicing_time_window])
+    else:
+        slicer = tonic.slicers.SliceByTime(time_window = slicing_time_window, include_incomplete = True)
+    sliced_dataset = tonic.SlicedDataset(dataset, transform = transform, slicer = slicer, metadata_path = metadata_path)
+
+    loader = torch.utils.data.DataLoader(sliced_dataset, shuffle = shuffle, num_workers = num_workers)
+    return loader
+
 
 def get_properties(events, target, ind_sample, values, ordering = 'xytp', distinguish_polarities = False):
     t_index, p_index = ordering.index('t'), ordering.index('p')
@@ -126,28 +142,85 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
         #axs[i].set_yscale("log")
     return values
 
-def plot_kernels(layer, pola, R, width=20):
-    kernel = layer.synapses.weight.data.T
-    fig = plt.figure(figsize=(width,pola/kernel.shape[1]*width))
-    for n in range(len(kernel[0,:])):
-        for p in range(pola):
-            sub = fig.add_subplot(pola,len(kernel[0,:]),n+len(kernel[0,:])*p+1)
-            dico = np.reshape(kernel[p*(2*R+1)**2:(p+1)*(2*R+1)**2,n], [int(np.sqrt(len(kernel)/pola)), int(np.sqrt(len(kernel)/pola))])
-            sub.imshow((dico), cmap=plt.cm.plasma)
-            sub.axes.get_xaxis().set_visible(False)
-            sub.axes.get_yaxis().set_visible(False)
-    plt.show()
+class HOTS_Dataset(tonic.dataset.Dataset):
+    """Make a dataset from the output of the HOTS network
+    """
+    dtype = np.dtype([("x", int), ("y", int), ("t", int), ("p", int)])
+    ordering = dtype.names
+
+    def __init__(self, path_to, sensor_size, train=True, transform=None, target_transform=None):
+        super(HOTS_Dataset, self).__init__(
+            path_to, transform=transform, target_transform=target_transform
+        )
+
+        self.location_on_system = path_to
+        
+        if not os.path.exists(self.location_on_system):
+            print('no output, process the samples first')
+            return
+
+        self.sensor_size = sensor_size
+        
+        for path, dirs, files in os.walk(self.location_on_system):
+            files.sort()
+            if dirs:
+                label_length = len(dirs[0])
+                self.classes = dirs
+                self.int_classes = dict(zip(self.classes, range(len(dirs))))
+            for file in files:
+                if file.endswith("npy"):
+                    self.data.append(np.load(os.path.join(path, file)))
+                    self.targets.append(self.int_classes[path[-label_length:]])
+
+    def __getitem__(self, index):
+        """
+        Returns:
+            a tuple of (events, target) where target is the index of the target class.
+        """
+        events, target = self.data[index], self.targets[index]
+        events = np.lib.recfunctions.unstructured_to_structured(events, self.dtype)
+        if self.transform is not None:
+            events = self.transform(events)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        return events, target
+
+    def __len__(self):
+        return len(self.data)
+
+def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     
-def plot_weight_distribution(layer, bins=np.linspace(0, 1, 50)):
-    kernels = layer.synapses.weight.data
-    fig, axs = plt.subplots(1,2, figsize=(12, 6))
-    n_neurons = kernels.size(dim=0)
-    ts_size = int(kernels.size(dim=1)/2)
-    for k in range (n_neurons):
-        pos_kernels = kernels[k][ts_size:]
-        neg_kernels = kernels[k][:ts_size]
-        axs[0].hist(neg_kernels, bins=bins, alpha=.1)
-        axs[0].set_xlabel('OFF polarities', fontsize=16)
-        axs[1].hist(pos_kernels, bins=bins, alpha=.1)
-        axs[1].set_xlabel('ON polarities', fontsize=16)
-    plt.show()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    p_index = trainset.ordering.index('p')
+    train_histo_map = torch.zeros([len(trainset),nb_output_pola], device = device)
+    train_labels = torch.zeros([len(trainset)], device = device)
+    
+    dist = torch.nn.PairwiseDistance(p=2)
+    score = 0
+    
+    for sample in tqdm(range(len(trainset))):
+        events, label = trainset[sample]
+        histo = torch.bincount(torch.tensor(events[0,:,p_index], device = device))
+        train_histo_map[sample,:len(histo)] = histo/histo.sum()
+        train_labels[sample] = label
+        
+    for sample in tqdm(range(len(testset))):
+        histo = torch.zeros([nb_output_pola], device = device)
+        events, label = testset[sample]
+        histo_bin = torch.bincount(torch.tensor(events[0,:,p_index], device = device))
+        histo[:len(histo_bin)] = histo_bin/histo_bin.sum()
+        distances = dist(histo, train_histo_map)
+        distances_sorted, indices = torch.sort(distances)
+        label_sorted = train_labels[indices].clone().detach().int()
+        inference = torch.bincount(label_sorted[:k]).argmax()
+        if inference==label:
+            score+=1
+    score/=len(testset)
+    return score
+        
+    
+        
+    
+        
+    

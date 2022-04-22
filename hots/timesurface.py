@@ -44,6 +44,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
             timesurface[timesurface < 0] = 0
         elif decay == "exp":
             timesurface = torch.exp(timestamp_context / tau)
+            timesurface[timesurface<torch.exp(torch.tensor(-5))] = 0
         all_surfaces[index, :, :, :] = timesurface
         indices = None
     if filtering_threshold:

@@ -6,7 +6,6 @@ class hotslayer(torch.nn.Module):
         self.synapses = torch.nn.Linear(ts_size, n_neurons, bias=bias, device=device)
         torch.nn.init.uniform_(self.synapses.weight, a=0, b=1)
         self.cumhisto = torch.ones([n_neurons], device=device)
-        self.clustering_flag = True
         self.homeo_flag = homeostasis
         
     def homeo_gain(self):
@@ -40,3 +39,14 @@ class hotslayer(torch.nn.Module):
             beta = self.synapses(all_ts)/(torch.linalg.norm(self.synapses.weight.data, dim=1))
             n_star = torch.argmax(beta, dim=1)
         return n_star
+    
+    
+class mlrlayer(torch.nn.Module):
+    
+    def __init__(self, ts_size, n_classes, device='cpu', bias=True):
+        super(LRtorch, self).__init__()
+        self.linear = torch.nn.Linear(ts_size, n_classes, bias=bias, device=device)
+        self.nl = torch.nn.Softmax(dim=1, device=device)
+
+    def forward(self, factors):
+        return self.nl(self.linear(factors))
