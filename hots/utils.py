@@ -170,7 +170,13 @@ class HOTS_Dataset(tonic.dataset.Dataset):
             for file in files:
                 if file.endswith("npy"):
                     self.data.append(np.load(os.path.join(path, file)))
-                    self.targets.append(self.int_classes[path[-label_length:]])
+                    n_target = 0
+                    indice = path.find(self.classes[n_target])
+                    while indice==-1:
+                        n_target += 1
+                        indice = path.find(self.classes[n_target])
+                        
+                    self.targets.append(self.int_classes[self.classes[n_target]])
 
     def __getitem__(self, index):
         """
