@@ -28,7 +28,7 @@ for lay in N_layers:
                 N_neuronz = [N_neuron*2**Nl for Nl in range(lay)]
                 N_pola = N_neuronz.copy()
                 N_pola.insert(0,2)
-                tauz = [tau*N_pola[Nl+1]/N_pola[Nl] for Nl in range(lay-1)]
+                tauz = [tau*N_pola[Nl+1]/2 for Nl in range(lay-1)]
                 tauz.insert(0,tau*2)
                 hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo)
                 filtering_threshold = [2*Rz[L] for L in range(len(Rz))]
