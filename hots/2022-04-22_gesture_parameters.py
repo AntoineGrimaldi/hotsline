@@ -14,10 +14,10 @@ homeo = True
 timestr = '2022-04-22'
 dataset_name = 'gesture'
 
-R_first = (2, 4, 8)
-N_layers = (2,3,4)
-n_first = (4,8,16)
-tau_first = (.1e3,.2e3,.5e3,1e3,2e3,5e3)
+R_first = [2, 4, 8]
+N_layers = [2,3,4]
+n_first = [8,16]
+tau_first = [.1e3,.2e3,.5e3,1e3,2e3,5e3,1e4]
 
 slicing_time_window = 1e6
 
@@ -29,8 +29,7 @@ for lay in N_layers:
                 N_neuronz = [N_neuron*2**Nl for Nl in range(lay)]
                 N_pola = N_neuronz.copy()
                 N_pola.insert(0,2)
-                tauz = [tau*N_pola[Nl+1]/N_pola[Nl] for Nl in range(lay-1)]
-                tauz.insert(0,tau*2)
+                tauz = [tau*N_pola[Nl] for Nl in range(lay)]
                 hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo)
                 filtering_threshold = [2*Rz[L] for L in range(len(Rz))]
                 #clustering

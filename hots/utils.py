@@ -160,13 +160,14 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
 class HOTS_Dataset(tonic.dataset.Dataset):
     """Make a dataset from the output of the HOTS network
     """
-    dtype = np.dtype([("x", int), ("y", int), ("t", int), ("p", int)])
-    ordering = dtype.names
 
-    def __init__(self, path_to, sensor_size, train=True, transform=None, target_transform=None):
+    def __init__(self, path_to, sensor_size, dtype, train=True, transform=None, target_transform=None):
         super(HOTS_Dataset, self).__init__(
             path_to, transform=transform, target_transform=target_transform
         )
+        
+        self.dtype = dtype
+        self.ordering = dtype.names
 
         self.location_on_system = path_to
         

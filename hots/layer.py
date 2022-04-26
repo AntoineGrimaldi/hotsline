@@ -44,9 +44,9 @@ class hotslayer(torch.nn.Module):
 class mlrlayer(torch.nn.Module):
     
     def __init__(self, ts_size, n_classes, device='cpu', bias=True):
-        super(LRtorch, self).__init__()
+        super(mlrlayer, self).__init__()
         self.linear = torch.nn.Linear(ts_size, n_classes, bias=bias, device=device)
-        self.nl = torch.nn.Softmax(dim=1, device=device)
+        self.nl = torch.nn.Softmax(dim=1)
 
     def forward(self, factors):
         return self.nl(self.linear(factors))
