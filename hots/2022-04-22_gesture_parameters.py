@@ -8,7 +8,6 @@ print(f' Tonic version installed -> {tonic.__version__}')
 
 transform = tonic.transforms.NumpyAsType(int)
 trainset = tonic.datasets.DVSGesture(save_to='../../Data/', train=True, transform=transform)
-testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform)
 
 name = 'homeohots'
 homeo = True
@@ -35,13 +34,17 @@ for lay in N_layers:
                 hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo)
                 filtering_threshold = [2*Rz[L] for L in range(len(Rz))]
                 #clustering
-                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, only_first=True)
-                hots.clustering(loader, trainset.ordering, filtering_threshold, stop_indice=100)
+                print('clustering')
+                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, only_first=True, kfold=10)
+                hots.clustering(loader, trainset.ordering, filtering_threshold)
                 #training
+                print('training')
+                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, only_first=True, kfold=2)
                 num_sample_train = len(loader)
                 hots.coding(loader, trainset.ordering, trainset.classes, filtering_threshold, training=True)
                 #testing
-                loader = get_sliced_loader(testset, slicing_time_window, dataset_name, only_first=True)
+                print('testing')
+                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, only_first=True, kfold=2, kfold_ind=1)
                 num_sample_test = len(loader)
                 hots.coding(loader, trainset.ordering, trainset.classes, filtering_threshold, training=False)
                 

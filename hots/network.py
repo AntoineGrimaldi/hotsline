@@ -39,7 +39,7 @@ class network(object):
         else:
             self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             
-    def clustering(self, loader, ordering, filtering_threshold, stop_indice = None, record = False):
+    def clustering(self, loader, ordering, filtering_threshold, record = False):
         path = '../Records/networks/'+self.name+'.pkl'
         if not os.path.exists(path):
             p_index = ordering.index('p')
@@ -51,7 +51,6 @@ class network(object):
                 homeostasis = []
 
             with torch.no_grad():
-                indice = 0
                 for events, target in tqdm(loader):
                     if record:
                         previous_dic = [self.layers[L].synapses.weight.data.T.detach().clone() for L in range(len(self.tau))]
@@ -74,9 +73,6 @@ class network(object):
                         events[0,:,p_index] = n_star.cpu()
                         del all_ts
                         torch.cuda.empty_cache()
-                        if indice==stop_indice:
-                            break
-                        indice +=1
 
             with open(path, 'wb') as file:
                 pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)

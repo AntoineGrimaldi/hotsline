@@ -25,7 +25,7 @@ def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=Tr
         loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
     return loader
 
-def get_sliced_loader(dataset, slicing_time_window, dataset_name, only_first = True, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True):
+def get_sliced_loader(dataset, slicing_time_window, dataset_name, only_first = True, kfold = None, kfold_ind = 0, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True, seed=42):
     
     classes = dataset.classes
     targets = dataset.targets
@@ -37,8 +37,23 @@ def get_sliced_loader(dataset, slicing_time_window, dataset_name, only_first = T
     else:
         slicer = tonic.slicers.SliceByTime(time_window = slicing_time_window, include_incomplete = True)
     sliced_dataset = tonic.SlicedDataset(dataset, transform = transform, slicer = slicer, metadata_path = metadata_path)
-
-    loader = torch.utils.data.DataLoader(sliced_dataset, shuffle = shuffle, num_workers = num_workers)
+    
+    classes = sliced_dataset.dataset.classes
+    targets = sliced_dataset.dataset.targets
+    
+    if kfold:
+        subset_indices = []
+        subset_size = len(sliced_dataset)//kfold
+        for i in range(len(classes)):
+            all_ind = np.where(np.array(targets)==i)[0]
+            subset_indices += all_ind[kfold_ind*subset_size//len(classes):
+                            min((kfold_ind+1)*subset_size//len(classes), len(sliced_dataset)-1)].tolist()
+        g_cpu = torch.Generator()
+        g_cpu.manual_seed(seed)
+        subsampler = torch.utils.data.SubsetRandomSampler(subset_indices, g_cpu)
+        loader = torch.utils.data.DataLoader(sliced_dataset, batch_size=1, shuffle=False, sampler=subsampler, num_workers = num_workers)
+    else:
+        loader = torch.utils.data.DataLoader(sliced_dataset, shuffle=shuffle, num_workers = num_workers)
     return loader
 
 
