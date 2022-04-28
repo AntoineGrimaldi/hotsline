@@ -1,7 +1,9 @@
-import torch, tonic, os
+import torch, tonic, os, pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from layer import mlrlayer
+from timesurface import timesurface
 
 def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
@@ -25,12 +27,12 @@ def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=Tr
         loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
     return loader
 
-def get_sliced_loader(dataset, slicing_time_window, dataset_name, only_first = True, kfold = None, kfold_ind = 0, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True, seed=42):
+def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_first = True, kfold = None, kfold_ind = 0, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True, seed=42):
     
     classes = dataset.classes
     targets = dataset.targets
 
-    metadata_path = f'./metadata/{dataset_name}_{int(slicing_time_window*1e-3)}_{only_first}'
+    metadata_path = f'./metadata/{dataset_name}_{int(slicing_time_window*1e-3)}_{only_first}_{train}'
 
     if only_first:
         slicer = tonic.slicers.SliceAtTimePoints(start_tw = [0], end_tw = [slicing_time_window])
@@ -241,8 +243,201 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     score/=len(testset)
     return score
         
+
+def fit_mlr(loader, 
+            model_path,
+            tau_cla,
+            learning_rate,
+            betas,
+            num_epochs,
+            ts_size,
+            ordering,
+            n_classes,
+            num_workers=0):
     
+    if os.path.exists(model_path):
+        with open(model_path, 'rb') as file:
+            classif_layer, losses = pickle.load(file)
+    
+    else:
+        torch.set_default_tensor_type("torch.DoubleTensor")
+        criterion = torch.nn.BCELoss(reduction="mean")
+        amsgrad = True #or False gives similar results
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f'device -> {device} - num_workers -> {num_workers}')
         
+        N = ts_size[0]*ts_size[1]*ts_size[2]
+
+        classif_layer = mlrlayer(N, n_classes, device=device)
+        classif_layer.train()
+        optimizer = torch.optim.Adam(
+            classif_layer.parameters(), lr=learning_rate, betas=betas, amsgrad=amsgrad
+        )
+
+        for epoch in tqdm(range(int(num_epochs))):
+            losses = []
+            for events, label in loader:
+                X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device=device)
+                
+                X, label = X.to(device) ,label.to(device)
+                X = X.reshape(X.shape[0], N)
+
+                outputs = classif_layer(X)
+
+                n_events = X.shape[0]
+                labels = label*torch.ones(n_events).type(torch.LongTensor).to(device)
+                labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).type(torch.DoubleTensor).to(device)
+
+                loss = criterion(outputs, labels)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                losses.append(loss.item())
+
+        with open(model_path, 'wb') as file:
+            pickle.dump([classif_layer, losses], file, pickle.HIGHEST_PROTOCOL)
+
+    return classif_layer, losses
+
+def predict_mlr(mlrlayer,
+                tau_cla,
+                loader,
+                results_path,
+                timesurface_size,
+                ordering,
+                num_workers = 0,
+        ):    
     
+    if os.path.isfile(results_path):
+        with open(results_path, 'rb') as file:
+            likelihood, true_target, timestamps = pickle.load(file) 
+    else:    
         
+        N = timesurface_size[0]*timesurface_size[1]*timesurface_size[2]
+        t_index = ordering.index('t')
+
+        with torch.no_grad():
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            print(f'device -> {device} - num_workers -> {num_workers}')
+            
+            logistic_model = mlrlayer.to(device)
+            likelihood, true_target, timestamps = [], [], []
+
+            for events, label in tqdm(loader):
+                timestamps.append(events[0,:,t_index])
+                X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
+                X, label = X.to(device) ,label.to(device)
+                X = X.reshape(X.shape[0], N)
+                n_events = X.shape[0]
+                outputs = logistic_model(X)
+                likelihood.append(outputs.cpu().numpy())
+                true_target.append(label.cpu().numpy())
+
+            with open(results_path, 'wb') as file:
+                pickle.dump([likelihood, true_target, timestamps], file, pickle.HIGHEST_PROTOCOL)
+
+    return likelihood, true_target, timestamps
+
+def score_classif_events(likelihood, true_target, thres=None, verbose=True):
     
+    max_len = 0
+    for likeli in likelihood:
+        if max_len<likeli.shape[0]:
+            max_len=likeli.shape[0]
+
+    matscor = np.zeros([len(true_target),max_len])
+    matscor[:] = np.nan
+    sample = 0
+    lastac = 0
+    nb_test = len(true_target)
+
+    for likelihood_, true_target_ in zip(likelihood, true_target):
+        pred_target = np.zeros(len(likelihood_))
+        pred_target[:] = np.nan
+        if not thres:
+            pred_target = np.argmax(likelihood_, axis = 1)
+        else:
+            for i in range(len(likelihood_)):
+                if np.max(likelihood_[i])>thres:
+                    pred_target[i] = np.argmax(likelihood_[i])
+        for event in range(len(pred_target)):
+            if np.isnan(pred_target[event])==False:
+                matscor[sample,event] = pred_target[event]==true_target_
+        if pred_target[-1]==true_target_:
+            lastac+=1
+        sample+=1
+
+    meanac = np.nanmean(matscor)
+    onlinac = np.nanmean(matscor, axis=0)
+    lastac/=nb_test
+    truepos = len(np.where(matscor==1)[0])
+    falsepos = len(np.where(matscor==0)[0])
+
+    if verbose:
+        print(f'Mean accuracy: {np.round(meanac,3)*100}%')
+        plt.semilogx(onlinac, '.');
+        plt.xlabel('number of events');
+        plt.ylabel('online accuracy');
+        plt.title('LR classification results evolution as a function of the number of events');
+    
+    return meanac, onlinac, lastac, truepos, falsepos
+
+def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None, verbose=True):
+    
+    max_dur = 0
+    for time in timestamps:
+        if max_dur<time[-1]:
+            max_dur=time[-1]
+            
+    time_axis = np.arange(0,max_dur,timestep)
+
+    matscor = np.zeros([len(true_target),len(time_axis)])
+    matscor[:] = np.nan
+    sample = 0
+    lastac = 0
+    nb_test = len(true_target)
+    
+    if verbose: pbar = tqdm(total=len(likelihood))
+    
+    for likelihood_, true_target_, timestamps_ in zip(likelihood, true_target, timestamps):
+        pred_timestep = np.zeros(len(time_axis))
+        pred_timestep[:] = np.nan
+        for step in range(1,len(pred_timestep)):
+            indices = np.where((timestamps_.numpy()<=time_axis[step])&(timestamps_.numpy()>time_axis[step-1]))[0]
+            mean_likelihood = np.mean(likelihood_[indices,:],axis=0)
+            if np.isnan(mean_likelihood).sum()>0:
+                pred_timestep[step] = np.nan
+            else:
+                if not thres:
+                    pred_timestep[step] = np.nanargmax(mean_likelihood)
+                elif np.max(likelihood_[indices,np.nanargmax(mean_likelihood)])>thres:
+                    pred_timestep[step] = np.nanargmax(mean_likelihood)
+                else:
+                    pred_timestep[step] = np.nan
+            if not np.isnan(pred_timestep[step]):
+                matscor[sample,step] = pred_timestep[step]==true_target_
+        
+        lastev = -1
+        while np.isnan(pred_timestep[lastev]):
+            lastev -= 1
+        if pred_timestep[lastev]==true_target_:
+            lastac+=1
+        if verbose: pbar.update(1)
+        sample+=1
+       
+    if verbose: pbar.close()
+    
+    meanac = np.nanmean(matscor)
+    onlinac = np.nanmean(matscor, axis=0)
+    lastac/=nb_test
+    truepos = len(np.where(matscor==1)[0])
+    falsepos = len(np.where(matscor==0)[0])
+        
+    if verbose:
+        print(f'Mean accuracy: {np.round(meanac,3)*100}%')
+        plt.semilogx(time_axis*1e-3,onlinac, '.');
+        plt.xlabel('time (in ms)');
+        plt.ylabel('online accuracy');
+        plt.title('LR classification results evolution as a function of time');
+    
+    return meanac, onlinac, lastac, truepos, falsepos

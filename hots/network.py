@@ -30,6 +30,7 @@ class network(object):
         self.R = R
         
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f'device -> {device}')
         
         path = '../Records/networks/'+self.name+'.pkl'
         if os.path.exists(path):
@@ -44,6 +45,7 @@ class network(object):
         if not os.path.exists(path):
             p_index = ordering.index('p')
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            
             if record:
                 entropy = []
                 loss = []
