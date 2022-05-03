@@ -1,4 +1,4 @@
-from layer import hotslayer
+from layer import hotslayer, snnlayer
 from tqdm import tqdm
 from timesurface import timesurface
 import numpy as np
@@ -17,11 +17,14 @@ class network(object):
                         tau = (1e1,1e2,1e3), #time constant for exponential decay in millisec
                         R = (2,4,8), # parameter defining the spatial size of the time surface
                         homeo = True, # parameters for homeostasis (None is no homeo rule)
+                        snn_analogy = False,
                         to_record = False,
                 ):
         assert len(nb_neurons) == len(R) & len(nb_neurons) == len(tau)
         
         self.name = f'{timestr}_{dataset_name}_{name}_{homeo}_{nb_neurons}_{tau}_{R}'
+        if snn_analogy:
+            self.name += 'SNN'
         nb_layers = len(nb_neurons)
         self.n_pola = [nb_neurons[L] for L in range(nb_layers-1)]
         self.n_pola.insert(0,2)
@@ -38,7 +41,10 @@ class network(object):
                 network = pickle.load(file)
             self.layers = network.layers
         else:
-            self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
+            if snn_analogy:
+                self.layers = [snnlayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
+            else:
+                self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             
     def clustering(self, loader, ordering, filtering_threshold, record = False):
         path = '../Records/networks/'+self.name+'.pkl'

@@ -349,6 +349,7 @@ def score_classif_events(likelihood, true_target, thres=None, verbose=True):
     matscor[:] = np.nan
     sample = 0
     lastac = 0
+    nancount = 0
     nb_test = len(true_target)
 
     for likelihood_, true_target_ in zip(likelihood, true_target):
