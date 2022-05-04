@@ -260,7 +260,6 @@ def fit_mlr(loader,
             classif_layer, losses = pickle.load(file)
     
     else:
-        torch.set_default_tensor_type("torch.DoubleTensor")
         criterion = torch.nn.BCELoss(reduction="mean")
         amsgrad = True #or False gives similar results
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -285,8 +284,8 @@ def fit_mlr(loader,
                 outputs = classif_layer(X)
 
                 n_events = X.shape[0]
-                labels = label*torch.ones(n_events).type(torch.LongTensor).to(device)
-                labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).type(torch.DoubleTensor).to(device)
+                labels = label*torch.ones(n_events).to(device)
+                labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device)
 
                 loss = criterion(outputs, labels)
                 optimizer.zero_grad()
@@ -312,7 +311,6 @@ def predict_mlr(mlrlayer,
         with open(results_path, 'rb') as file:
             likelihood, true_target, timestamps = pickle.load(file) 
     else:    
-        
         N = timesurface_size[0]*timesurface_size[1]*timesurface_size[2]
         t_index = ordering.index('t')
 
@@ -324,12 +322,15 @@ def predict_mlr(mlrlayer,
             likelihood, true_target, timestamps = [], [], []
 
             for events, label in tqdm(loader):
-                timestamps.append(events[0,:,t_index])
-                X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
-                X, label = X.to(device) ,label.to(device)
-                X = X.reshape(X.shape[0], N)
-                n_events = X.shape[0]
-                outputs = logistic_model(X)
+                timestamps.append(events[0,0,:,t_index])
+                if events.shape[2]==0:
+                    outputs = torch.Tensor([])
+                else:
+                    X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
+                    X, label = X.to(device) ,label.to(device)
+                    X = X.reshape(X.shape[0], N)
+                    n_events = X.shape[0]
+                    outputs = logistic_model(X)
                 likelihood.append(outputs.cpu().numpy())
                 true_target.append(label.cpu().numpy())
 
@@ -353,19 +354,22 @@ def score_classif_events(likelihood, true_target, thres=None, verbose=True):
     nb_test = len(true_target)
 
     for likelihood_, true_target_ in zip(likelihood, true_target):
-        pred_target = np.zeros(len(likelihood_))
-        pred_target[:] = np.nan
-        if not thres:
-            pred_target = np.argmax(likelihood_, axis = 1)
+        if len(likelihood_)!=0:
+            pred_target = np.zeros(len(likelihood_))
+            pred_target[:] = np.nan
+            if not thres:
+                pred_target = np.argmax(likelihood_, axis = 1)
+            else:
+                for i in range(len(likelihood_)):
+                    if np.max(likelihood_[i])>thres:
+                        pred_target[i] = np.argmax(likelihood_[i])
+            for event in range(len(pred_target)):
+                if np.isnan(pred_target[event])==False:
+                    matscor[sample,event] = pred_target[event]==true_target_
+            if pred_target[-1]==true_target_:
+                lastac+=1
         else:
-            for i in range(len(likelihood_)):
-                if np.max(likelihood_[i])>thres:
-                    pred_target[i] = np.argmax(likelihood_[i])
-        for event in range(len(pred_target)):
-            if np.isnan(pred_target[event])==False:
-                matscor[sample,event] = pred_target[event]==true_target_
-        if pred_target[-1]==true_target_:
-            lastac+=1
+            matscor[sample,:] = 0
         sample+=1
 
     meanac = np.nanmean(matscor)

@@ -90,7 +90,7 @@ class network(object):
                     pickle.dump([loss, entropy, delta_w, homeostasis], file, pickle.HIGHEST_PROTOCOL)
             
             
-    def coding(self, loader, ordering, classes, filtering_threshold, training, jitter=(None,None)):
+    def coding(self, loader, ordering, classes, filtering_threshold, training, jitter=(None,None), verbose=True):
         for L in range(len(self.tau)):
             self.layers[L].homeo_flag = False
         
@@ -102,7 +102,8 @@ class network(object):
         else: output_path = f'../Records/output/test/{self.name}_{len(loader)}_{jitter}/'
         
         if os.path.exists(output_path):
-            print(f'this dataset have already been processed, check at: \n {output_path}')
+            if verbose:
+                print(f'this dataset have already been processed, check at: \n {output_path}')
         else:
             for classe in classes:
                 os.makedirs(output_path+f'{classe}')
