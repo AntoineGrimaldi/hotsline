@@ -223,13 +223,13 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     dist = torch.nn.PairwiseDistance(p=2)
     score = 0
     
-    for sample in tqdm(range(len(trainset))):
+    for sample in range(len(trainset)):
         events, label = trainset[sample]
         histo = torch.bincount(torch.tensor(events[0,:,p_index], device = device))
         train_histo_map[sample,:len(histo)] = histo/histo.sum()
         train_labels[sample] = label
         
-    for sample in tqdm(range(len(testset))):
+    for sample in range(len(testset)):
         histo = torch.zeros([nb_output_pola], device = device)
         events, label = testset[sample]
         histo_bin = torch.bincount(torch.tensor(events[0,:,p_index], device = device))
