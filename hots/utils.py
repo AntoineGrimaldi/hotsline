@@ -284,8 +284,8 @@ def fit_mlr(loader,
                 outputs = classif_layer(X)
 
                 n_events = X.shape[0]
-                labels = label*torch.ones(n_events).to(device)
-                labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device)
+                labels = label*torch.ones(n_events).to(device).to(torch.int64)
+                labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device).to(torch.float32)
 
                 loss = criterion(outputs, labels)
                 optimizer.zero_grad()
@@ -339,7 +339,7 @@ def predict_mlr(mlrlayer,
 
     return likelihood, true_target, timestamps
 
-def score_classif_events(likelihood, true_target, thres=None, verbose=True):
+def score_classif_events(likelihood, true_target, n_classes, thres=None, verbose=True):
     
     max_len = 0
     for likeli in likelihood:
@@ -354,6 +354,7 @@ def score_classif_events(likelihood, true_target, thres=None, verbose=True):
     nb_test = len(true_target)
 
     for likelihood_, true_target_ in zip(likelihood, true_target):
+        
         if len(likelihood_)!=0:
             pred_target = np.zeros(len(likelihood_))
             pred_target[:] = np.nan
@@ -369,14 +370,20 @@ def score_classif_events(likelihood, true_target, thres=None, verbose=True):
             if pred_target[-1]==true_target_:
                 lastac+=1
         else:
-            matscor[sample,:] = 0
+            pred_target = np.random.randint(0,n_classes)
+            matscor[sample,:] = pred_target==true_target_
+            if pred_target==true_target_:
+                lastac+=1
         sample+=1
 
-    meanac = np.nanmean(matscor)
-    onlinac = np.nanmean(matscor, axis=0)
-    lastac/=nb_test
-    truepos = len(np.where(matscor==1)[0])
-    falsepos = len(np.where(matscor==0)[0])
+    if matscor.shape[1]==0:
+        meanac = 1/n_classes
+        onlinac = 1/n_classes
+        lastac = 1/n_classes
+    else:
+        meanac = np.nanmean(matscor)
+        onlinac = np.nanmean(matscor, axis=0)
+        lastac/=nb_test
 
     if verbose:
         print(f'Mean accuracy: {np.round(meanac,3)*100}%')
@@ -385,7 +392,7 @@ def score_classif_events(likelihood, true_target, thres=None, verbose=True):
         plt.ylabel('online accuracy');
         plt.title('LR classification results evolution as a function of the number of events');
     
-    return meanac, onlinac, lastac, truepos, falsepos
+    return meanac, onlinac, lastac
 
 def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None, verbose=True):
     
