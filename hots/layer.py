@@ -2,6 +2,7 @@ import torch
 
 class hotslayer(torch.nn.Module):
     def __init__(self, ts_size, n_neurons, homeostasis = True, device="cpu", bias=False):#, dtype='torch.float64'):
+        super(hotslayer, self).__init__()
         self.synapses = torch.nn.Linear(ts_size, n_neurons, bias=bias, device=device)#, dtype=dtype)
         torch.nn.init.uniform_(self.synapses.weight, a=0, b=1)
         self.cumhisto = torch.ones([n_neurons], device=device)
