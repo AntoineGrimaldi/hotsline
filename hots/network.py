@@ -70,11 +70,13 @@ class network(object):
                         if record:
                             proto_ts = all_ts.detach().clone()
                             kernels = self.layers[L].synapses.weight.data.T
+                            DIFF = 0
                             for ev in range(len(n_star)):
                                 proto_ts[ev,:,:,:] = torch.reshape(kernels[:,int(n_star[ev].cpu())], (self.n_pola[L], 2*self.R[L]+1, 2*self.R[L]+1))
-                                diff = torch.linalg.norm(all_ts-proto_ts)
-                                diff = diff.mean()
-                            loss.append(diff.cpu())
+                                diff = torch.linalg.norm(all_ts[ev,:,:,:]-proto_ts[ev,:,:,:])
+                                DIFF += diff.mean()
+                            DIFF/=len(n_star)
+                            loss.append(DIFF.cpu())
                             entropy.append(-(kernels*torch.log(kernels)).sum().cpu())
                             delta_w.append((kernels-previous_dic[L]).abs().mean().cpu())
                             homeostasis.append((self.layers[L].cumhisto/self.layers[L].cumhisto.sum()-1/kernels.shape[1]).abs().mean().cpu())
