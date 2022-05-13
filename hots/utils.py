@@ -5,6 +5,16 @@ from tqdm import tqdm
 from layer import mlrlayer
 from timesurface import timesurface
 
+
+def printfig(fig, name):
+    dpi_exp = None
+    bbox = 'tight'
+    path = '../../manuscript/fig/'
+    #path = '../../GrimaldiEtAl2020HOTS_clone_laurent/fig'
+    fig.savefig(path+name, dpi = dpi_exp, bbox_inches=bbox, transparent=True)
+    
+    
+
 def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
     # then the dataset is splitted into different folds with equal repartition of the classes.
@@ -327,7 +337,7 @@ def predict_mlr(mlrlayer,
                     outputs = torch.Tensor([])
                 else:
                     X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
-                    X, label = X.to(device) ,label.to(device)
+                    X, label = X.to(device), label.to(device)
                     X = X.reshape(X.shape[0], N)
                     n_events = X.shape[0]
                     outputs = logistic_model(X)
@@ -339,7 +349,7 @@ def predict_mlr(mlrlayer,
 
     return likelihood, true_target, timestamps
 
-def score_classif_events(likelihood, true_target, n_classes, thres=None, verbose=True):
+def score_classif_events(likelihood, true_target, n_classes, thres=None, verbose=True, figure_name=False):
     
     max_len = 0
     for likeli in likelihood:
@@ -387,10 +397,21 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, verbose
 
     if verbose:
         print(f'Mean accuracy: {np.round(meanac,3)*100}%')
-        plt.semilogx(onlinac, '.');
-        plt.xlabel('number of events');
-        plt.ylabel('online accuracy');
-        plt.title('LR classification results evolution as a function of the number of events');
+        fig, ax = plt.subplots()
+        sampling = (np.logspace(0,np.log10(max_len),100)).astype(int)
+        ax.semilogx(sampling[:-1],onlinac[sampling[:-1]]*100, '.', label='online HOTS');
+        ax.hlines(1/n_classes*100,0,int(max_len), linestyles='dashed', color='k', label='chance level')
+        ax.set_xlabel('Number of events', fontsize=16);
+        ax.set_ylabel('Accuracy (in %)', fontsize=16);
+        ax.axis([1,int(max_len),0,100]);
+        #plt.title('LR classification results evolution as a function of the number of events');
+        #ax.set_yticklabels(ax.get_yticklabels(),fontsize=12)
+        #ax.set_xticklabels(ax.get_xticklabels(),fontsize=12)
+        plt.setp(ax.get_yticklabels(),fontsize=12)
+        plt.setp(ax.get_xticklabels(),fontsize=12)
+        ax.legend(fontsize=12, loc='lower right');
+        if figure_name:
+            printfig(fig, figure_name)
     
     return meanac, onlinac, lastac
 
@@ -453,3 +474,4 @@ def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None
         plt.title('LR classification results evolution as a function of time');
     
     return meanac, onlinac, lastac, truepos, falsepos
+

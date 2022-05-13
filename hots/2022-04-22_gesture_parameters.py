@@ -15,10 +15,10 @@ homeo = True
 timestr = '2022-04-22'
 dataset_name = 'gesture'
 
-R_first = [2, 4, 8]
-N_layers = [2,3,4]
-n_first = [8,16]
-tau_first = [.1e3,.2e3,.5e3,1e3,2e3,5e3,1e4]
+R_first = [4, 8]
+N_layers = [2]
+n_first = [16]
+tau_first = [5e3,1e4,2e4]
 
 slicing_time_window = 1e6
 
@@ -35,11 +35,11 @@ for lay in N_layers:
                 filtering_threshold = [2*Rz[L] for L in range(len(Rz))]
                 #clustering
                 print('clustering')
-                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, True, only_first=True, kfold=10)
+                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, True, only_first=True, kfold=20)
                 hots.clustering(loader, trainset.ordering, filtering_threshold)
                 #training
                 print('training')
-                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, True, only_first=True, kfold=2)
+                loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, True, only_first=True, kfold=3)
                 num_sample_train = len(loader)
                 hots.coding(loader, trainset.ordering, trainset.classes, filtering_threshold, training=True)
                 #testing
