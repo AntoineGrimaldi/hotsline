@@ -15,8 +15,8 @@ homeo = True
 timestr = '2022-04-22'
 dataset_name = 'gesture'
 
-R_first = [4, 8]
-N_layers = [2]
+R_first = [4]#, 8]
+N_layers = [3]
 n_first = [16]
 tau_first = [5e3,1e4,2e4]
 
