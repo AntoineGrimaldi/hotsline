@@ -2,8 +2,10 @@ import torch, tonic, os, pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from layer import mlrlayer
-from timesurface import timesurface
+from hots.layer import mlrlayer
+from hots.timesurface import timesurface
+from scipy.stats import beta
+from scipy.optimize import curve_fit
 
 
 def printfig(fig, name):
@@ -14,7 +16,6 @@ def printfig(fig, name):
     fig.savefig(path+name, dpi = dpi_exp, bbox_inches=bbox, transparent=True)
     
     
-
 def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
     # then the dataset is splitted into different folds with equal repartition of the classes.
@@ -165,6 +166,8 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
         axs[i].set_title(f'Histogram for the {ttl}')
         maxfreq = n.max()
         axs[i].set_ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
+        
+        print(f'Mean value for {ttl}: {np.array(x).mean()}')
         #axs[i].set_xscale("log")
         #axs[i].set_yscale("log")
     return values
@@ -282,9 +285,10 @@ def fit_mlr(loader,
         optimizer = torch.optim.Adam(
             classif_layer.parameters(), lr=learning_rate, betas=betas, amsgrad=amsgrad
         )
-
+        mean_loss_epoch = []
         for epoch in tqdm(range(int(num_epochs))):
-            losses = []
+            losses = np.zeros([len(loader)])
+            i = 0
             for events, label in loader:
                 X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device=device)
                 
@@ -301,12 +305,14 @@ def fit_mlr(loader,
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                losses.append(loss.item())
-
+                losses[i] = loss.item()
+                i += 1
+            mean_loss_epoch.append(losses.mean())
+            
         with open(model_path, 'wb') as file:
             pickle.dump([classif_layer, losses], file, pickle.HIGHEST_PROTOCOL)
 
-    return classif_layer, losses
+    return classif_layer, mean_loss_epoch
 
 def predict_mlr(mlrlayer,
                 tau_cla,
@@ -332,13 +338,14 @@ def predict_mlr(mlrlayer,
             likelihood, true_target, timestamps = [], [], []
 
             for events, label in tqdm(loader):
-                timestamps.append(events[0,0,:,t_index])
+                events.squeeze(0).squeeze(0)
+                timestamps.append(events[:,t_index])
                 if events.shape[2]==0:
                     outputs = torch.Tensor([])
                 else:
                     X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
                     X, label = X.to(device), label.to(device)
-                    X = X.reshape(X.shape[0], N)
+                    X = X.reshape(X.shape[0], N).to(torch.float32)
                     n_events = X.shape[0]
                     outputs = logistic_model(X)
                 likelihood.append(outputs.cpu().numpy())
@@ -349,7 +356,7 @@ def predict_mlr(mlrlayer,
 
     return likelihood, true_target, timestamps
 
-def score_classif_events(likelihood, true_target, n_classes, thres=None, verbose=True, figure_name=False):
+def score_classif_events(likelihood, true_target, n_classes, thres=None, original_accuracy = None, original_accuracy_nohomeo = None, verbose=True, figure_name=False):
     
     max_len = 0
     for likeli in likelihood:
@@ -399,17 +406,20 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, verbose
         print(f'Mean accuracy: {np.round(meanac,3)*100}%')
         fig, ax = plt.subplots()
         sampling = (np.logspace(0,np.log10(max_len),100)).astype(int)
-        ax.semilogx(sampling[:-1],onlinac[sampling[:-1]]*100, '.', label='online HOTS');
+        ax.semilogx(sampling[:-1],onlinac[sampling[:-1]]*100, '.', label='online HOTS (ours)');
         ax.hlines(1/n_classes*100,0,int(max_len), linestyles='dashed', color='k', label='chance level')
+        if original_accuracy:
+            ax.hlines(original_accuracy*100,0,int(max_len), linestyles='dashed', color='g', label='HOTS with homeostasis')
+        if original_accuracy_nohomeo:
+            ax.hlines(original_accuracy_nohomeo*100,0,int(max_len), linestyles='dashed', color='r', label='original HOTS')
         ax.set_xlabel('Number of events', fontsize=16);
-        ax.set_ylabel('Accuracy (in %)', fontsize=16);
-        ax.axis([1,int(max_len),0,100]);
+        ax.axis([1,int(max_len),0,101]);
         #plt.title('LR classification results evolution as a function of the number of events');
-        #ax.set_yticklabels(ax.get_yticklabels(),fontsize=12)
-        #ax.set_xticklabels(ax.get_xticklabels(),fontsize=12)
-        plt.setp(ax.get_yticklabels(),fontsize=12)
         plt.setp(ax.get_xticklabels(),fontsize=12)
+        #ax.set_yticks([])
+        plt.setp(ax.get_yticklabels(),fontsize=12)
         ax.legend(fontsize=12, loc='lower right');
+        ax.set_ylabel('Accuracy (in %)', fontsize=16);
         if figure_name:
             printfig(fig, figure_name)
     
@@ -475,3 +485,54 @@ def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None
     
     return meanac, onlinac, lastac, truepos, falsepos
 
+
+def NR_jitter(jitter,Rmax,Rmin,jitter0,powa): 
+    x = jitter**powa
+    semisat = jitter0**powa
+    output = Rmax-Rmax*x/(x+jitter0)+Rmin
+    return output
+
+def fit_NR(jitter,accuracy,init_params=[1,1/10,1e4,2]):
+    popt, pcov = curve_fit(NR_jitter, jitter, accuracy, p0 = init_params)
+    Rmin = popt[0]
+    Rmax = popt[1]
+    semisat = popt[2]
+    powa = popt[3]
+
+    return Rmin,Rmax,semisat, powa
+
+def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', label='name', nb_class=10, n_epo = 33, fitting = True, logscale = False):
+    score_stat = np.zeros([3,len(jit)])
+    q = [0.05,0.95]
+    for i in range(score.shape[1]):
+        mean = np.mean(score[:,i])
+        if np.unique(score[:,i]).shape[0]==1:
+            score_stat[0,i], score_stat[1,i], score_stat[2,i] = mean, mean, mean
+        else:
+            paramz = beta.fit(score[:,i]*.9999+.00001, floc=0, fscale = 1)
+            score_stat[0,i], score_stat[2,i] = beta.ppf(q, a=paramz[0], b=paramz[1])
+            score_stat[1,i] = np.mean(score[:,i])
+
+    if fitting:
+        Rmax,Rmin,semisat,powa = fit_NR(jit,score_stat[1,:],init_params=param)
+        if logscale:
+            jitter_cont = np.logspace(np.min(np.log10(jit)),np.max(np.log10(jit)),100) 
+            nr_fit = NR_jitter(jitter_cont,Rmax,Rmin,semisat, powa)
+            ax.semilogx(jitter_cont, nr_fit*100, color=color, lw=1)
+        else:
+            jitter_cont = np.linspace(np.min(jit),np.max(jit),100) 
+            nr_fit = NR_jitter(jitter_cont,Rmax,Rmin,semisat,powa)
+            ax.plot(jitter_cont, nr_fit*100, color=color, lw=1)
+    if logscale:
+        ax.semilogx(jit, score_stat[1,:]*100, '.',color=color, label=label)
+    else:
+        ax.plot(jit, score_stat[1,:]*100, '.',color=color, label=label)
+    ax.fill_between(jit, score_stat[2,:]*100, score_stat[0,:]*100, facecolor=color, edgecolor=None, alpha=.3)
+        
+    x_halfsat = []
+    if fitting:
+        halfsat = (Rmax-Rmin)/2+Rmin
+        ind_halfsat = np.where(nr_fit<halfsat)[0]
+        x_halfsat = jitter_cont[ind_halfsat[0]]
+
+    return fig, ax, x_halfsat

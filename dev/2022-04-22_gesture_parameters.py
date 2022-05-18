@@ -15,10 +15,12 @@ homeo = True
 timestr = '2022-04-22'
 dataset_name = 'gesture'
 
-R_first = [4]#, 8]
+R_first = [2]#, 8]
 N_layers = [3]
 n_first = [16]
 tau_first = [5e3,1e4,2e4]
+
+mean_nb_events = 4e5/6
 
 slicing_time_window = 1e6
 
@@ -31,9 +33,19 @@ for lay in N_layers:
                 N_pola = N_neuronz.copy()
                 N_pola.insert(0,2)
                 tauz = [tau*N_pola[Nl] for Nl in range(lay)]
+                memory_network = 0
+                for nl in range(lay):
+                    mem_ts = (2*Rz[nl]+1)**2*N_pola[nl]*4
+                    memory_time_surfaces = mean_nb_events*mem_ts
+                    memory_network += mem_ts*N_neuronz[nl]
+                    print(f'Estimated memory to allocate for time surfaces of layer L{nl+1} -> {memory_time_surfaces*1e-9} Gbit')
+                print(f'Estimated memory to allocate for the network -> {memory_network*1e-9}')
+                print(f'Total -> {(memory_network+memory_time_surfaces)*1e-9}')
+                
                 hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo)
                 filtering_threshold = [2*Rz[L] for L in range(len(Rz))]
                 #clustering
+                print(hots.name)
                 print('clustering')
                 loader = get_sliced_loader(trainset, slicing_time_window, dataset_name, True, only_first=True, kfold=20)
                 hots.clustering(loader, trainset.ordering, filtering_threshold)

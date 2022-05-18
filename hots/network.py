@@ -1,6 +1,6 @@
-from layer import hotslayer, snnlayer
+from hots.layer import hotslayer, snnlayer
 from tqdm import tqdm
-from timesurface import timesurface
+from hots.timesurface import timesurface
 import numpy as np
 import matplotlib.pyplot as plt
 import torch, os
@@ -46,7 +46,7 @@ class network(object):
             else:
                 self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             
-    def clustering(self, loader, ordering, filtering_threshold, record = False):
+    def clustering(self, loader, ordering, filtering_threshold = None, record = False):
         path = '../Records/networks/'+self.name+'.pkl'
         if not os.path.exists(path):
             p_index = ordering.index('p')
@@ -59,6 +59,9 @@ class network(object):
                 homeostasis = []
 
             with torch.no_grad():
+                
+                if not filtering_threshold: filtering_threshold = [None for L in range(len(self.tau))]
+                
                 for events, target in tqdm(loader):
                     if record:
                         previous_dic = [self.layers[L].synapses.weight.data.T.detach().clone() for L in range(len(self.tau))]
@@ -92,9 +95,10 @@ class network(object):
                     pickle.dump([loss, entropy, delta_w, homeostasis], file, pickle.HIGHEST_PROTOCOL)
             
             
-    def coding(self, loader, ordering, classes, filtering_threshold, training, jitter=(None,None), verbose=True):
+    def coding(self, loader, ordering, classes, training, filtering_threshold = None, jitter=(None,None), verbose=True):
         for L in range(len(self.tau)):
             self.layers[L].homeo_flag = False
+        if not filtering_threshold: filtering_threshold = [None for L in range(len(self.tau))]
         
         p_index = ordering.index('p')
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -144,9 +148,9 @@ class network(object):
         fig = plt.figure(figsize=(16,9))
         gs = fig.add_gridspec(np.sum(P)+hisiz, np.sum(N)+len(self.tau)-1, wspace=0.05, hspace=0.05)
         if self.layers[-1].homeo_flag:
-            fig.suptitle('Activation histograms and associated time surfaces with homeostasis', size=20, y=0.95)
+            fig.suptitle('Unsupervised clustering with homeostasis', size=20, y=0.95)
         else:
-            fig.suptitle('Activation histograms and associated time surfaces for original hots', size=20, y=0.95)
+            fig.suptitle('Unsupervised clustering for original HOTS', size=20, y=0.95)
 
         for L in range(len(self.tau)):
             ax = fig.add_subplot(gs[:hisiz, int(np.sum(N[:L]))+1*L:int(np.sum(N[:L+1]))+L*1])
