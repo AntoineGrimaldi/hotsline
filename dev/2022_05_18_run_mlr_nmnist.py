@@ -3,7 +3,7 @@ from tqdm import tqdm
 from hots.network import network
 from hots.layer import mlrlayer
 from hots.timesurface import timesurface
-from utils import get_loader, make_histogram_classification, HOTS_Dataset, fit_mlr, predict_mlr, score_classif_events, plotjitter, printfig
+from hots.utils import get_loader, make_histogram_classification, HOTS_Dataset, fit_mlr, predict_mlr, score_classif_events, plotjitter, printfig
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -12,7 +12,6 @@ print(f'Tonic version installed -> {tonic.__version__}')
 print(f'Number of GPU devices available: {torch.cuda.device_count()}')
 for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
-    
     
 kfold = None
 
@@ -31,7 +30,7 @@ print(f'number of samples in the testing set: {len(testloader)}')
 
 name = 'homeohots'
 homeo = True
-timestr = '2022-04-22'
+timestr = '2022-04-27'
 dataset_name = 'nmnist'
 
 Rz = [2, 4]

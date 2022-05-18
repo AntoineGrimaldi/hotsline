@@ -6,3 +6,8 @@ hots/.ipynb_checkpoints/
 hots/metadata/
 Records/
 dev/.ipynb_checkpoints/
+hots.egg-info/*
+.ipynb_checkpoints/
+build/
+dist/
+*.pyc

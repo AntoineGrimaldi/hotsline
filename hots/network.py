@@ -38,8 +38,8 @@ class network(object):
         path = '../Records/networks/'+self.name+'.pkl'
         if os.path.exists(path):
             with open(path, 'rb') as file:
-                network = pickle.load(file)
-            self.layers = network.layers
+                my_network = pickle.load(file)
+            self.layers = my_network.layers
         else:
             if snn_analogy:
                 self.layers = [snnlayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]

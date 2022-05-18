@@ -1,0 +1,6 @@
+tqdm
+tonic == 1.0.19
+torch == 1.11.0
+numpy == 1.21.5
+scipy == 1.8.0
+matplotlib == 3.5.1

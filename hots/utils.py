@@ -270,7 +270,7 @@ def fit_mlr(loader,
     
     if os.path.exists(model_path):
         with open(model_path, 'rb') as file:
-            classif_layer, losses = pickle.load(file)
+            classif_layer, mean_loss_epoch = pickle.load(file)
     
     else:
         criterion = torch.nn.BCELoss(reduction="mean")
