@@ -2,7 +2,7 @@
 ___author__ = "(c) Antoine Grimaldi & Laurent Perrinet INT - CNRS (2020-)"
 __version__ = '2022-05-18'
 __licence__ = 'GPLv3'
-__all__ = ['network.py']
+__all__ = ['network.py', 'layer.py', 'timesurface.py', 'utils.py']
 """
 ========================================================
 A Hierarchy of event-based Time-Surfaces for Pattern Recognition
