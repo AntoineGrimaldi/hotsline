@@ -30,7 +30,7 @@ print(f'number of samples in the testing set: {len(testloader)}')
 
 name = 'homeohots'
 homeo = True
-timestr = '2022-04-27'
+timestr = '2022-05-19'
 dataset_name = 'nmnist'
 
 Rz = [2, 4]
@@ -39,12 +39,18 @@ tauz = [1e4*2, 1e4*16]
 
 hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo)
 
+filtering_threshold = [5, None]
+
 if not os.path.exists('../Records/'):
     os.mkdir('../Records/')
     os.mkdir('../Records/networks/')
 path = '../Records/networks/'+hots.name+'.pkl'
 if not os.path.exists(path):
-    hots.clustering(loader, trainset.ordering)
+    hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
+    
+hots.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True)  
+hots.coding(testloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=False)
+
      
 jitter = (None, None)
 num_workers = 0
@@ -62,6 +68,71 @@ model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}
 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
-trainloader = get_loader(trainset_output)
+trainloader_output = get_loader(trainset_output)
 
-classif_layer, losses = fit_mlr(trainloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes))
+classif_layer, losses = fit_mlr(trainloader_output, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes))
+
+
+likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader,results_path,ts_size,testset_output.ordering)
+score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
+meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, original_accuracy = score, figure_name = 'nmnist_online.pdf')
+
+
+
+
+
+
+
+std_jit_t_min = 3
+std_jit_t_max = 7
+std_jit_t = np.logspace(std_jit_t_min,std_jit_t_max,20)
+scores_jit_t = np.zeros([nb_trials, len(std_jit_t)])
+scores_jit_t_histo = np.zeros([nb_trials, len(std_jit_t)])
+scores_jit_t_histo_nohomeo = np.zeros([nb_trials, len(std_jit_t)])
+
+jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{std_jit_t_min}_{std_jit_t_max}'
+if not os.path.exists(jitter_path+'.npz'):
+
+    torch.set_default_tensor_type("torch.DoubleTensor")
+
+    for trial in tqdm(range(nb_trials)):
+        for ind_jit, temporal_jitter in enumerate(std_jit_t):
+            if temporal_jitter==0:
+                jitter = (None,None)
+            else:
+                jitter = (None,temporal_jitter)
+            test_path = f'../Records/output/test/{initial_name}_{trial}_{num_sample_test}_{jitter}/'
+            results_path = f'../Records/LR_results/{initial_name}_{trial}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+            hots.name = initial_name+f'_{trial}'
+
+            tonic.transforms.TimeJitter(std = temporal_jitter, clip_negative = True, sort_timestamps = True)
+            temporal_jitter_transform = tonic.transforms.TimeJitter(std = temporal_jitter, clip_negative = True, sort_timestamps = True)
+            temporal_jitter_transform_full = tonic.transforms.Compose([temporal_jitter_transform, type_transform])
+            testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=temporal_jitter_transform_full)
+            loader = get_loader(testset, kfold=kfold)
+            hots.coding(loader, testset.ordering, testset.classes, training=False, jitter = jitter, verbose=False)
+
+            testset_output = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+            testloader = get_loader(testset_output)
+
+            likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader,results_path,ts_size,testset_output.ordering)
+            meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, verbose=False)
+
+            scores_jit_t_histo[trial,ind_jit] = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
+            scores_jit_t[trial,ind_jit] = lastac
+
+            test_path_nohomeo = f'../Records/output/test/{initial_name_nohomeo}_{trial}_{num_sample_test}_{jitter}/'
+            results_path_nohomeo = f'../Records/LR_results/{initial_name_nohomeo}_{trial}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+            hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
+
+            hots_nohomeo.coding(loader, testset.ordering, testset.classes, training=False, jitter=jitter, verbose=False)
+            testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+
+            scores_jit_t_histo_nohomeo[trial,ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, N_neuronz[-1])
+            np.savez(jitter_path, std_jit_t,scores_jit_t,scores_jit_t_histo,scores_jit_t_histo_nohomeo)
+else:
+    data_stored = np.load(jitter_path+'.npz')
+    std_jit_t = data_stored['arr_0']
+    scores_jit_t = data_stored['arr_1']
+    scores_jit_t_histo = data_stored['arr_2']
+    scores_jit_t_histo_nohomeo = data_stored['arr_3']

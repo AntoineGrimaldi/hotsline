@@ -1,19 +1,12 @@
 Metadata-Version: 2.1
 Name: hots
 Version: 1.0
-Summary:  This is a collection of python scripts to do Pattern recognition with of event-based stream
-Author: Antoine Grimaldi, Institut de Neurosciences de la Timone (CNRS/Aix-Marseille Université)
+Summary:  This is a collection of python scripts to do Pattern recognition with an event-based stream
+Author: Antoine Grimaldi, Institut de Neurosciences de la Timone (CNRS/Aix-Marseille Universite)
+Author-email: antoine.grimaldi@univ-amu.fr
 License: LICENSE.txt
 Keywords: Event based Pattern Recognition,Hierarchical model
 Platform: UNKNOWN
-Classifier: Development Status :: 3 - Alpha
-Classifier: Environment :: Console
-Classifier: License :: OSI Approved :: GNU General Public License (GPL)
-Classifier: Operating System :: POSIX
-Classifier: Topic :: Scientific/Engineering
-Classifier: Topic :: Utilities
-Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.7
 Provides-Extra: html
 License-File: LICENSE
 
