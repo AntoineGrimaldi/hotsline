@@ -327,6 +327,7 @@ def predict_mlr(mlrlayer,
         with open(results_path, 'rb') as file:
             likelihood, true_target, timestamps = pickle.load(file) 
     else:    
+        print(timesurface_size)
         N = timesurface_size[0]*timesurface_size[1]*timesurface_size[2]
         t_index = ordering.index('t')
 
@@ -536,3 +537,131 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
         x_halfsat = jitter_cont[ind_halfsat[0]]
 
     return fig, ax, x_halfsat
+
+
+def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None):
+    
+    initial_name = hots.name
+    initial_name_nohomeo = hots_nohomeo.name
+    
+    n_output_neurons = len(hots.layers[-1].cumhisto)
+    ts_size = [trainset_output.sensor_size[0],trainset_output.sensor_size[1],n_output_neurons]
+    
+    type_transform = tonic.transforms.NumpyAsType(int)
+    
+    if not os.path.exists('../Records/jitter_results/'):
+        os.mkdir('../Records/jitter_results/')
+    if jitter_type=='temporal':
+        std_jit_t = np.logspace(min_jitter,max_jitter,nb_points)
+        jitter_values = std_jit_t
+    else:
+        std_jit_s = np.linspace(min_jitter,max_jitter,nb_points)
+        var_jit_s = std_jit_s**2
+        jitter_values = var_jit_s
+        
+    scores_jit = np.zeros([nb_trials, len(jitter_values)])
+    scores_jit_histo = np.zeros([nb_trials, len(jitter_values)])
+    scores_jit_histo_nohomeo = np.zeros([nb_trials, len(jitter_values)])
+
+    jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}'
+
+    if not os.path.exists(jitter_path+'.npz'):
+
+        torch.set_default_tensor_type("torch.DoubleTensor")
+
+        for trial in tqdm(range(nb_trials)):
+            for ind_jit, jitter_val in enumerate(jitter_values):
+                if jitter_val==0:
+                    jitter = (None,None)
+                else:
+                    if jitter_type=='temporal':
+                        jitter = (None,jitter_val)
+                    else:
+                        jitter = (jitter_val,None)
+                        
+                test_path = f'../Records/output/test/{initial_name}_{trial}_{num_sample_test}_{jitter}/'
+                results_path = f'../Records/LR_results/{initial_name}_{trial}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+                hots.name = initial_name+f'_{trial}'
+
+                if jitter_type=='temporal':
+                    temporal_jitter_transform = tonic.transforms.TimeJitter(std = jitter_val, clip_negative = True, sort_timestamps = True)
+                    transform_full = tonic.transforms.Compose([temporal_jitter_transform, type_transform])
+                else:
+                    spatial_jitter_transform = tonic.transforms.SpatialJitter(sensor_size = trainset_output.sensor_size, variance_x = jitter_val, variance_y = jitter_val, clip_outliers = True)
+                    transform_full = tonic.transforms.Compose([spatial_jitter_transform, type_transform])
+                    
+                if dataset_name=='poker':
+                    testset = tonic.datasets.POKERDVS(save_to='../../Data/', train=False, transform=transform_full)
+                elif dataset_name=='nmnist':
+                    testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
+                    
+                loader = get_loader(testset, kfold = kfold)
+                hots.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter = jitter, verbose=False)
+
+                testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, dtype=trainset_output.dtype, transform=type_transform)
+                testloader = get_loader(testset_output)
+
+                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader,results_path,ts_size,testset_output.ordering)
+                meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, verbose=False)
+
+                scores_jit_histo[trial,ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
+                scores_jit[trial,ind_jit] = lastac
+
+                test_path_nohomeo = f'../Records/output/test/{initial_name_nohomeo}_{trial}_{num_sample_test}_{jitter}/'
+                results_path_nohomeo = f'../Records/LR_results/{initial_name_nohomeo}_{trial}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+                hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
+
+                hots_nohomeo.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter=jitter, verbose=False)
+                testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, dtype=trainset_output.dtype, transform=type_transform)
+
+                scores_jit_histo_nohomeo[trial,ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
+                
+        if jitter_type=='spatial':
+            jitter_values = np.sqrt(jitter_values)
+        np.savez(jitter_path, jitter_values,scores_jit,scores_jit_histo,scores_jit_histo_nohomeo)
+        hots.name = initial_name
+    else:
+        data_stored = np.load(jitter_path+'.npz')
+        jitter_values = data_stored['arr_0']
+        scores_jit = data_stored['arr_1']
+        scores_jit_histo = data_stored['arr_2']
+        scores_jit_histo_nohomeo = data_stored['arr_3']
+        
+    if jitter_type=='temporal':
+        logscale=True
+        jitter_values*=1e-3
+    else:
+        logscale=False
+
+    fig_t, ax_t = plt.subplots(1,1,figsize=(8,5))
+    colorz = ['#2ca02c','#1f77b4','#d62728']
+    label = 'online HOTS (ours)'
+    param_T = [.99, 1/n_classes, 20, 1] # to change to adjust the fit
+    n_epoch = 33
+
+    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit, param = param_T, color=colorz[1], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)
+    if fitting:
+        print(f'semi saturation level for {label}: {np.round(semisat_t,2)} ms')
+
+    label = 'HOTS with homeostasis'
+    param_T = [.95, 1/n_classes, 8, .1] # to change to adjust the fit
+    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit_histo, param = param_T, color=colorz[0], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)
+    if fitting:
+        print(f'semi saturation level for {label}: {np.round(semisat_t,2)} ms')
+
+    label = 'original HOTS'
+    param_T = [.95,1/n_classes, 2, 2] # to change to adjust the fit
+    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit_histo_nohomeo, param = param_T, color=colorz[2], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)
+    if fitting:
+        print(f'semi saturation level for {label}: {np.round(semisat_t,2)} ms')
+
+    chance_t = np.ones([len(jitter_values)])*100/n_classes
+    ax_t.plot(jitter_values,chance_t, 'k--', label='chance level')
+    ax_t.axis([1,max(jitter_values),0,100]);
+    ax_t.set_xlabel('Standard deviation of temporal jitter (in $ms$)', fontsize=16);
+    ax_t.set_ylabel('Accuracy (in %)', fontsize=16);
+        
+    if figure_name:
+        printfig(fig, figure_name)
+    
+    return jitter_values, scores_jit, scores_jit_histo, scores_jit_histo_nohomeo
