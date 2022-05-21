@@ -74,7 +74,10 @@ trainloader_output = get_loader(trainset_output)
 
 classif_layer, losses = fit_mlr(trainloader_output, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes))
 
+trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+testset_output = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+testloader_output = get_loader(testset_output)
 
-likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader,results_path,ts_size,testset_output.ordering)
+likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader_output,results_path,ts_size,testset_output.ordering)
 score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
 meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, original_accuracy = score, figure_name = 'nmnist_online.pdf')

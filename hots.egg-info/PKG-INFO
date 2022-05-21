@@ -2,12 +2,11 @@ Metadata-Version: 2.1
 Name: hots
 Version: 1.0
 Summary:  This is a collection of python scripts to do Pattern recognition with an event-based stream
+Home-page: https://github.com/AntoineGrimaldi/hotsline
 Author: Antoine Grimaldi, Institut de Neurosciences de la Timone (CNRS/Aix-Marseille Universite)
 Author-email: antoine.grimaldi@univ-amu.fr
-License: LICENSE.txt
-Keywords: Event based Pattern Recognition,Hierarchical model
+License: GNU General Public License v3.0
 Platform: UNKNOWN
-Provides-Extra: html
 License-File: LICENSE
 
 # hotsline

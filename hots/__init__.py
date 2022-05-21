@@ -1,6 +1,6 @@
 
 ___author__ = "(c) Antoine Grimaldi & Laurent Perrinet INT - CNRS (2020-)"
-__version__ = '2022-05-18'
+__version__ = '1.0'
 __licence__ = 'GPLv3'
 __all__ = ['network.py', 'layer.py', 'timesurface.py', 'utils.py']
 """

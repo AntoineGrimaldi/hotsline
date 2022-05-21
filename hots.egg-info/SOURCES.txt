@@ -9,5 +9,4 @@ hots/utils.py
 hots.egg-info/PKG-INFO
 hots.egg-info/SOURCES.txt
 hots.egg-info/dependency_links.txt
-hots.egg-info/requires.txt
 hots.egg-info/top_level.txt
