@@ -11,7 +11,7 @@ VERSION = "1.0"
 setup(
     name=NAME,
     version=VERSION,
-    package_dir={'hotsline': NAME},
+    package_dir={'hots': NAME},
     packages=find_packages(),
     author='Antoine Grimaldi, Institut de Neurosciences de la Timone (CNRS/Aix-Marseille Universite)',
     author_email='antoine.grimaldi@univ-amu.fr',

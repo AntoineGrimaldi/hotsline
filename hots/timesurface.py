@@ -48,7 +48,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
             timesurface = torch.exp(timestamp_context / tau)
             timesurface[timesurface<torch.exp(torch.tensor(-5))] = 0
         all_surfaces[index, :, :, :] = timesurface
-        indices = None
+    indices = None
     if filtering_threshold:
         indices = torch.nonzero(all_surfaces.sum(dim=(1,2,3))>filtering_threshold).squeeze(1)
         all_surfaces = all_surfaces[indices, :, :, :]
