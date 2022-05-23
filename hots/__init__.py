@@ -12,7 +12,7 @@ Pattern Recognition' Xavier Lagorce, Garrick Orchard, Fransesco Gallupi, And Rya
 """
 
 # TODO : include new names for scripts and code
-from hots import layer
-from hots import network
-from hots import timesurface
-from hots import utils
+from .layer import *
+from .network import *
+from .timesurface import *
+from .utils import *

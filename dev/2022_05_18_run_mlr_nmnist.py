@@ -14,9 +14,9 @@ for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
     
 kfold = None
-
+drop_proba = .5
 type_transform = tonic.transforms.NumpyAsType(int)
-drop_transform = tonic.transforms.DropEvent(p = .9)
+drop_transform = tonic.transforms.DropEvent(p = drop_proba)
 full_transform = tonic.transforms.Compose([drop_transform,type_transform])
 trainset = tonic.datasets.NMNIST(save_to='../../Data/', train=True, transform=type_transform)
 testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=type_transform)
@@ -66,8 +66,8 @@ tau_cla = 1e5
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
-model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
-results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
+results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=full_transform)
 trainloader_output = get_loader(trainset_output)

@@ -327,7 +327,6 @@ def predict_mlr(mlrlayer,
         with open(results_path, 'rb') as file:
             likelihood, true_target, timestamps = pickle.load(file) 
     else:    
-        print(timesurface_size)
         N = timesurface_size[0]*timesurface_size[1]*timesurface_size[2]
         t_index = ordering.index('t')
 
@@ -339,9 +338,9 @@ def predict_mlr(mlrlayer,
             likelihood, true_target, timestamps = [], [], []
 
             for events, label in tqdm(loader):
-                events.squeeze(0).squeeze(0)
+                events = events.squeeze(0).squeeze(0)
                 timestamps.append(events[:,t_index])
-                if events.shape[2]==0:
+                if events.shape[1]==0:
                     outputs = torch.Tensor([])
                 else:
                     X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
