@@ -166,7 +166,6 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
         axs[i].set_title(f'Histogram for the {ttl}')
         maxfreq = n.max()
         axs[i].set_ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
-        print(x)
         print(f'Mean value for {ttl}: {np.array(x).mean()}')
         #axs[i].set_xscale("log")
         #axs[i].set_yscale("log")
@@ -239,7 +238,7 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     for sample in range(len(trainset)):
         events, label = trainset[sample]
         if events.shape[0]==1:
-            events.squeeze(0)
+            events = events.squeeze(0)
         histo = torch.bincount(torch.tensor(events[:,p_index], device = device))
         train_histo_map[sample,:len(histo)] = histo/histo.sum()
         train_labels[sample] = label
@@ -248,7 +247,7 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
         histo = torch.zeros([nb_output_pola], device = device)
         events, label = testset[sample]
         if events.shape[0]==1:
-            events.squeeze(0)
+            events = events.squeeze(0)
         histo_bin = torch.bincount(torch.tensor(events[:,p_index], device = device))
         histo[:len(histo_bin)] = histo_bin/histo_bin.sum()
         distances = dist(histo, train_histo_map)
