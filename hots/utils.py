@@ -166,7 +166,7 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
         axs[i].set_title(f'Histogram for the {ttl}')
         maxfreq = n.max()
         axs[i].set_ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
-        
+        print(x)
         print(f'Mean value for {ttl}: {np.array(x).mean()}')
         #axs[i].set_xscale("log")
         #axs[i].set_yscale("log")
@@ -238,14 +238,18 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     
     for sample in range(len(trainset)):
         events, label = trainset[sample]
-        histo = torch.bincount(torch.tensor(events[0,:,p_index], device = device))
+        if events.shape[0]==1:
+            events.squeeze(0)
+        histo = torch.bincount(torch.tensor(events[:,p_index], device = device))
         train_histo_map[sample,:len(histo)] = histo/histo.sum()
         train_labels[sample] = label
         
     for sample in range(len(testset)):
         histo = torch.zeros([nb_output_pola], device = device)
         events, label = testset[sample]
-        histo_bin = torch.bincount(torch.tensor(events[0,:,p_index], device = device))
+        if events.shape[0]==1:
+            events.squeeze(0)
+        histo_bin = torch.bincount(torch.tensor(events[:,p_index], device = device))
         histo[:len(histo_bin)] = histo_bin/histo_bin.sum()
         distances = dist(histo, train_histo_map)
         distances_sorted, indices = torch.sort(distances)
@@ -265,8 +269,7 @@ def fit_mlr(loader,
             num_epochs,
             ts_size,
             ordering,
-            n_classes,
-            num_workers=0):
+            n_classes):
     
     if os.path.exists(model_path):
         with open(model_path, 'rb') as file:
@@ -276,7 +279,7 @@ def fit_mlr(loader,
         criterion = torch.nn.BCELoss(reduction="mean")
         amsgrad = True #or False gives similar results
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f'device -> {device} - num_workers -> {num_workers}')
+        print(f'device -> {device}')
         
         N = ts_size[0]*ts_size[1]*ts_size[2]
 
@@ -320,7 +323,6 @@ def predict_mlr(mlrlayer,
                 results_path,
                 timesurface_size,
                 ordering,
-                num_workers = 0,
         ):    
     
     if os.path.isfile(results_path):
@@ -332,7 +334,7 @@ def predict_mlr(mlrlayer,
 
         with torch.no_grad():
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            print(f'device -> {device} - num_workers -> {num_workers}')
+            print(f'device -> {device}')
             
             logistic_model = mlrlayer.to(device)
             likelihood, true_target, timestamps = [], [], []

@@ -14,15 +14,18 @@ for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
     
 kfold = None
-drop_proba = .5
+drop_proba = None
 type_transform = tonic.transforms.NumpyAsType(int)
-drop_transform = tonic.transforms.DropEvent(p = drop_proba)
-full_transform = tonic.transforms.Compose([drop_transform,type_transform])
+if drop_proba:
+    drop_transform = tonic.transforms.DropEvent(p = drop_proba)
+    full_transform = tonic.transforms.Compose([drop_transform,type_transform])
+else: 
+    full_transform = type_transform
 trainset = tonic.datasets.NMNIST(save_to='../../Data/', train=True, transform=type_transform)
 testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=type_transform)
-loader = get_loader(trainset, kfold=300)
-trainloader = get_loader(trainset, kfold=kfold)
-testloader = get_loader(testset, kfold=kfold)
+loader = get_loader(trainset, kfold=300, num_workers=num_workers)
+trainloader = get_loader(trainset, kfold=kfold, num_workers=num_workers)
+testloader = get_loader(testset, kfold=kfold, num_workers=num_workers)
 num_sample_train = len(trainloader)
 num_sample_test = len(testloader)
 n_classes = len(testset.classes)
@@ -70,13 +73,13 @@ model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}
 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=full_transform)
-trainloader_output = get_loader(trainset_output)
+trainloader_output = get_loader(trainset_output, num_workers=num_workers)
 
 classif_layer, losses = fit_mlr(trainloader_output, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes))
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
 testset_output = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
-testloader_output = get_loader(testset_output)
+testloader_output = get_loader(testset_output, num_workers=num_workers)
 
 likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader_output,results_path,ts_size,testset_output.ordering)
 score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
