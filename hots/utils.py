@@ -1,4 +1,4 @@
-import torch, tonic, os, pickle
+import torch, tonic, os, pickle, copy
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -16,7 +16,7 @@ def printfig(fig, name):
     fig.savefig(path+name, dpi = dpi_exp, bbox_inches=bbox, transparent=True)
     
     
-def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, seed=42):
+def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, batch_size = 1, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
     # then the dataset is splitted into different folds with equal repartition of the classes.
     
@@ -33,9 +33,11 @@ def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=Tr
         g_cpu = torch.Generator()
         g_cpu.manual_seed(seed)
         subsampler = torch.utils.data.SubsetRandomSampler(subset_indices, g_cpu)
-        loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, sampler=subsampler, num_workers = num_workers)
+        loader = torch.utils.data.DataLoader(dataset, shuffle=False, sampler=subsampler, num_workers = num_workers)
+        #loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, sampler=subsampler, num_workers = num_workers, collate_fn=tonic.collation.PadTensors(batch_first=True))
     else:
         loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers)
+        #loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers, batch_size=batch_size, collate_fn=tonic.collation.PadTensors(batch_first=True))
     return loader
 
 def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_first = True, kfold = None, kfold_ind = 0, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True, seed=42):
@@ -214,6 +216,8 @@ class HOTS_Dataset(tonic.dataset.Dataset):
             a tuple of (events, target) where target is the index of the target class.
         """
         events, target = self.data[index], self.targets[index]
+        if len(events.shape)>2:
+            events = events.squeeze(0)
         events = np.lib.recfunctions.unstructured_to_structured(events, self.dtype)
         if self.transform is not None:
             events = self.transform(events)
@@ -293,8 +297,7 @@ def fit_mlr(loader,
             i = 0
             for events, label in loader:
                 X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device=device)
-                
-                X, label = X.to(device) ,label.to(device)
+                X, label = X.to(device).squeeze(0).to(torch.float32),label.to(device)
                 X = X.reshape(X.shape[0], N)
 
                 outputs = classif_layer(X)
@@ -309,10 +312,11 @@ def fit_mlr(loader,
                 optimizer.step()
                 losses[i] = loss.item()
                 i += 1
+                torch.cuda.empty_cache()
             mean_loss_epoch.append(losses.mean())
             
         with open(model_path, 'wb') as file:
-            pickle.dump([classif_layer, losses], file, pickle.HIGHEST_PROTOCOL)
+            pickle.dump([classif_layer, mean_loss_epoch], file, pickle.HIGHEST_PROTOCOL)
 
     return classif_layer, mean_loss_epoch
 
@@ -330,28 +334,34 @@ def predict_mlr(mlrlayer,
     else:    
         N = timesurface_size[0]*timesurface_size[1]*timesurface_size[2]
         t_index = ordering.index('t')
+        
+        initial_memory = copy.copy(torch.cuda.memory_allocated())
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f'device -> {device}')
+
+        classif_layer = mlrlayer.to(device)
+        
         with torch.no_grad():
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            print(f'device -> {device}')
+            # needed for previous versions, now it should be ok to remove it
+            classif_layer.linear = classif_layer.linear.float()
             
-            logistic_model = mlrlayer.to(device)
             likelihood, true_target, timestamps = [], [], []
 
             for events, label in tqdm(loader):
-                events = events.squeeze(0).squeeze(0)
+                events = events.squeeze(0)
                 timestamps.append(events[:,t_index])
                 if events.shape[1]==0:
                     outputs = torch.Tensor([])
                 else:
-                    X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
-                    X, label = X.to(device), label.to(device)
-                    X = X.reshape(X.shape[0], N).to(torch.float32)
+                    X, ind_filtered = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
                     n_events = X.shape[0]
-                    outputs = logistic_model(X)
+                    X, label = X.to(device).squeeze(0).to(torch.float32), label.to(device)
+                    X = X.reshape(n_events, N)
+                    outputs = classif_layer(X)
                 likelihood.append(outputs.cpu().numpy())
                 true_target.append(label.cpu().numpy())
-
+                torch.cuda.empty_cache()
             with open(results_path, 'wb') as file:
                 pickle.dump([likelihood, true_target, timestamps], file, pickle.HIGHEST_PROTOCOL)
 

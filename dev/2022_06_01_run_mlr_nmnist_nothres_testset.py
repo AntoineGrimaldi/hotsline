@@ -1,11 +1,9 @@
 import tonic, torch, os, pickle
 from tqdm import tqdm
-from hots.network import network
-from hots.layer import mlrlayer
-from hots.timesurface import timesurface
-from hots.utils import get_loader, make_histogram_classification, HOTS_Dataset, fit_mlr, predict_mlr, score_classif_events, plotjitter, printfig
-import matplotlib.pyplot as plt
-import numpy as np
+from network import network
+from layer import mlrlayer
+from timesurface import timesurface
+from utils import get_loader, make_histogram_classification, HOTS_Dataset, fit_mlr, predict_mlr, score_classif_events, score_classif_time
 
 print(f'Tonic version installed -> {tonic.__version__}')
 
@@ -31,7 +29,7 @@ print(f'number of samples in the testing set: {len(testloader)}')
 
 name = 'homeohots'
 homeo = True
-timestr = '2022-05-19'
+timestr = '2022-04-22'
 dataset_name = 'nmnist'
 
 Rz = [2, 4]
@@ -50,11 +48,16 @@ if not os.path.exists(path):
     hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
     
 hots.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True)  
+
+initial_name = hots.name
+modified_name = initial_name + '_nothres_testset'
+hots.name = modified_name
 hots.coding(testloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=False)
 
+hots.name = initial_name
      
 jitter = (None, None)
-num_workers = 4
+num_workers = 0
 learning_rate = 0.005
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
@@ -62,28 +65,29 @@ num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
 tau_cla = 1e5
-drop_proba = .3
+drop_proba = None
 
-timesurface = tonic.transforms.ToTimesurface(sensor_size=ts_size, tau=tau_cla, decay='exp')
 if drop_proba:
     drop_transform = tonic.transforms.DropEvent(p = drop_proba)
-    timesurface_transform = tonic.transforms.Compose([drop_transform, timesurface, type_transform])
+    full_transform = tonic.transforms.Compose([drop_transform, type_transform])
+    model_path = f'../Records/networks/{initial_name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
+    results_path = f'../Records/LR_results/{modified_name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
 else:
-    timesurface_transform = tonic.transforms.Compose([timesurface, type_transform])
+    full_transform = type_transform
+    model_path = f'../Records/networks/{initial_name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+    results_path = f'../Records/LR_results/{modified_name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+    
+train_path = f'../Records/output/train/{initial_name}_{num_sample_train}_{jitter}/'
+test_path = f'../Records/output/test/{initial_name}_{num_sample_test}_{jitter}/'
 
-train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
-test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
-model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
-results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
-
-trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=timesurface_transform)
+trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=full_transform)
 trainloader_output = get_loader(trainset_output, num_workers=num_workers)
 
 classif_layer, losses = fit_mlr(trainloader_output, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes))
 
-trainset_output_histp = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
-testset_output_histo = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
-testset_output = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=timesurface_transform)
+trainset_output_histp = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=full_transform)
+testset_output_histo = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=full_transform)
+testset_output = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=full_transform)
 testloader_output = get_loader(testset_output, num_workers=num_workers)
 
 likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader_output,results_path,ts_size,testset_output.ordering)

@@ -125,6 +125,7 @@ class network(object):
                         events[0,:,p_index] = n_star.cpu()
                         del all_ts
                         torch.cuda.empty_cache()
+                    events = events.squeeze(0)
                     np.save(output_path+f'{classes[target]}/{nb}', events)
                     nb+=1
                     

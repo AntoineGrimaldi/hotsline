@@ -49,7 +49,8 @@ class mlrlayer(torch.nn.Module):
         self.nl = torch.nn.Softmax(dim=1)
 
     def forward(self, factors):
-        return self.nl(self.linear(factors))
+        V = self.linear(factors)
+        return self.nl(V)
     
     
 class snnlayer(torch.nn.Module):
