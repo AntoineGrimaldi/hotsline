@@ -194,9 +194,10 @@ class HOTS_Dataset(tonic.dataset.Dataset):
         self.sensor_size = sensor_size
         
         for path, dirs, files in os.walk(self.location_on_system):
-            files.sort()
             if dirs:
-                label_length = len(dirs[0])
+                files.sort()
+                dirs.sort()
+                label_length = len(dirs)
                 self.classes = dirs
                 self.int_classes = dict(zip(self.classes, range(len(dirs))))
             for file in files:
@@ -207,8 +208,10 @@ class HOTS_Dataset(tonic.dataset.Dataset):
                     while indice==-1:
                         n_target += 1
                         indice = path.find(self.classes[n_target])
-                        
+
                     self.targets.append(self.int_classes[self.classes[n_target]])
+                        
+        self.num_samples = len(self.targets)
 
     def __getitem__(self, index):
         """
@@ -226,7 +229,7 @@ class HOTS_Dataset(tonic.dataset.Dataset):
         return events, target
 
     def __len__(self):
-        return len(self.data)
+        return self.num_samples
 
 def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     
@@ -241,8 +244,6 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     
     for sample in range(len(trainset)):
         events, label = trainset[sample]
-        if events.shape[0]==1:
-            events = events.squeeze(0)
         histo = torch.bincount(torch.tensor(events[:,p_index], device = device))
         train_histo_map[sample,:len(histo)] = histo/histo.sum()
         train_labels[sample] = label
@@ -251,7 +252,9 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
         histo = torch.zeros([nb_output_pola], device = device)
         events, label = testset[sample]
         if events.shape[0]==1:
+            print(events)
             events = events.squeeze(0)
+            print(events)
         histo_bin = torch.bincount(torch.tensor(events[:,p_index], device = device))
         histo[:len(histo_bin)] = histo_bin/histo_bin.sum()
         distances = dist(histo, train_histo_map)
@@ -382,7 +385,6 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
     nb_test = len(true_target)
 
     for likelihood_, true_target_ in zip(likelihood, true_target):
-        
         if len(likelihood_)!=0:
             pred_target = np.zeros(len(likelihood_))
             pred_target[:] = np.nan
@@ -531,7 +533,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
             nr_fit = NR_jitter(jitter_cont,Rmax,Rmin,semisat, powa)
             ax.semilogx(jitter_cont, nr_fit*100, color=color, lw=1)
         else:
-            jitter_cont = np.linspace(np.min(jit),np.max(jit),100) 
+            jitter_cont = np.linspace(np.min(jit),np.max(jit),100)
             nr_fit = NR_jitter(jitter_cont,Rmax,Rmin,semisat,powa)
             ax.plot(jitter_cont, nr_fit*100, color=color, lw=1)
     if logscale:
@@ -549,10 +551,10 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
     return fig, ax, x_halfsat
 
 
-def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None):
+def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None, verbose = False):
     
-    initial_name = hots.name
-    initial_name_nohomeo = hots_nohomeo.name
+    initial_name = copy.copy(hots.name)
+    initial_name_nohomeo = copy.copy(hots_nohomeo.name)
     
     n_output_neurons = len(hots.layers[-1].cumhisto)
     ts_size = [trainset_output.sensor_size[0],trainset_output.sensor_size[1],n_output_neurons]
@@ -593,6 +595,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
                 results_path = f'../Records/LR_results/{initial_name}_{trial}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
                 hots.name = initial_name+f'_{trial}'
 
+                print(test_path)
                 if jitter_type=='temporal':
                     temporal_jitter_transform = tonic.transforms.TimeJitter(std = jitter_val, clip_negative = True, sort_timestamps = True)
                     transform_full = tonic.transforms.Compose([temporal_jitter_transform, type_transform])
@@ -625,6 +628,12 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
                 testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, dtype=trainset_output.dtype, transform=type_transform)
 
                 scores_jit_histo_nohomeo[trial,ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
+                
+                if verbose: 
+                    print(f'For {jitter_type} jitter equal to {jitter_val}')
+                    print(f'Online HOTS accuracy: {lastac*100} %')
+                    print(f'Original HOTS accuracy: {scores_jit_histo_nohomeo[trial,ind_jit]*100} %')
+                    print(f'HOTS with homeostasis accuracy: {scores_jit_histo[trial,ind_jit]*100} %')
                 
         if jitter_type=='spatial':
             jitter_values = np.sqrt(jitter_values)

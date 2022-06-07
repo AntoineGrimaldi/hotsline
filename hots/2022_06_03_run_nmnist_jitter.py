@@ -24,7 +24,6 @@ n_classes = len(testset.classes)
 print(f'number of samples in the training set: {len(trainloader)}')
 print(f'number of samples in the testing set: {len(testloader)}')
 
-
 name = 'homeohots'
 homeo = True
 timestr = '2022-04-22'
