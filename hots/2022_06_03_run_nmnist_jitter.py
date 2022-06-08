@@ -70,26 +70,26 @@ test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
 model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 
-hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
-hots.coding(testloader, trainset.ordering, trainset.classes, training=False, verbose=False)
+hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, filtering_threshold = filtering_threshold, verbose=False)
+hots.coding(testloader, trainset.ordering, trainset.classes, training=False, filtering_threshold = filtering_threshold, verbose=False)
 
-trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 trainoutputloader = get_loader(trainset_output)
-testset_output = HOTS_Dataset(test_path, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+testset_output = HOTS_Dataset(test_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 testoutputloader = get_loader(testset_output)
 
 classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes))
 
-hots_nohomeo.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
+hots_nohomeo.coding(trainloader, trainset.ordering, trainset.classes, training=True, filtering_threshold = filtering_threshold, verbose=False)
 
 train_path_nohomeo = f'../Records/output/train/{hots_nohomeo.name}_{num_sample_train}_{jitter}/'
 model_path_nohomeo = f'../Records/networks/{hots_nohomeo.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 test_path_nohomeo = f'../Records/output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
 
-trainset_output_nohomeo = HOTS_Dataset(train_path_nohomeo, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+trainset_output_nohomeo = HOTS_Dataset(train_path_nohomeo, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 
-hots_nohomeo.coding(testloader, testset.ordering, testset.classes, training=False, jitter=jitter, verbose=False)
-testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset.sensor_size, dtype=trainset.dtype, transform=type_transform)
+hots_nohomeo.coding(testloader, testset.ordering, testset.classes, training=False, filtering_threshold = filtering_threshold, jitter=jitter, verbose=False)
+testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 
 likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering)
 score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
@@ -101,9 +101,9 @@ kfold = 10
 
 standard_spatial_jitter_min = 0
 standard_spatial_jitter_max = 10
-apply_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', num_sample_test//kfold, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate ,betas ,num_epochs, kfold = kfold);
+apply_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', num_sample_test//kfold, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate ,betas ,num_epochs, kfold = kfold, verbose=True);
 
 
 standard_temporal_jitter_min = 3
 standard_temporal_jitter_max = 7
-apply_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', num_sample_test//kfold, n_classes, hots,hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate ,betas ,num_epochs,  kfold = kfold)
+apply_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', num_sample_test//kfold, n_classes, hots,hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate ,betas ,num_epochs,  kfold = kfold, verbose=True)
