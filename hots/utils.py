@@ -177,29 +177,23 @@ class HOTS_Dataset(tonic.dataset.Dataset):
     """Make a dataset from the output of the HOTS network
     """
 
-    def __init__(self, path_to, sensor_size, dtype, train=True, transform=None, target_transform=None):
+    def __init__(self, path_to, sensor_size, classes, dtype, train=True, transform=None, target_transform=None):
         super(HOTS_Dataset, self).__init__(
             path_to, transform=transform, target_transform=target_transform
         )
         
         self.dtype = dtype
         self.ordering = dtype.names
-
+        self.classes = classes
+        self.int_classes = dict(zip(self.classes, range(len(classes))))
         self.location_on_system = path_to
+        self.sensor_size = sensor_size
         
         if not os.path.exists(self.location_on_system):
             print('no output, process the samples first')
             return
-
-        self.sensor_size = sensor_size
         
         for path, dirs, files in os.walk(self.location_on_system):
-            if dirs:
-                files.sort()
-                dirs.sort()
-                label_length = len(dirs)
-                self.classes = dirs
-                self.int_classes = dict(zip(self.classes, range(len(dirs))))
             for file in files:
                 if file.endswith("npy"):
                     self.data.append(np.load(os.path.join(path, file)))
@@ -208,7 +202,6 @@ class HOTS_Dataset(tonic.dataset.Dataset):
                     while indice==-1:
                         n_target += 1
                         indice = path.find(self.classes[n_target])
-
                     self.targets.append(self.int_classes[self.classes[n_target]])
                         
         self.num_samples = len(self.targets)
@@ -251,18 +244,15 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
     for sample in range(len(testset)):
         histo = torch.zeros([nb_output_pola], device = device)
         events, label = testset[sample]
-        if events.shape[0]==1:
-            print(events)
-            events = events.squeeze(0)
-            print(events)
-        histo_bin = torch.bincount(torch.tensor(events[:,p_index], device = device))
-        histo[:len(histo_bin)] = histo_bin/histo_bin.sum()
-        distances = dist(histo, train_histo_map)
-        distances_sorted, indices = torch.sort(distances)
-        label_sorted = train_labels[indices].clone().detach().int()
-        inference = torch.bincount(label_sorted[:k]).argmax()
-        if inference==label:
-            score+=1
+        if events.shape[0]>0:
+            histo_bin = torch.bincount(torch.tensor(events[:,p_index], device = device))
+            histo[:len(histo_bin)] = histo_bin/histo_bin.sum()
+            distances = dist(histo, train_histo_map)
+            distances_sorted, indices = torch.sort(distances)
+            label_sorted = train_labels[indices].clone().detach().int()
+            inference = torch.bincount(label_sorted[:k]).argmax()
+            if inference==label:
+                score+=1
     score/=len(testset)
     return score
         
@@ -551,7 +541,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
     return fig, ax, x_halfsat
 
 
-def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None, verbose = False):
+def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None, verbose = False):
     
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
@@ -609,9 +599,9 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
                     testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
                     
                 loader = get_loader(testset, kfold = kfold)
-                hots.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter = jitter, verbose=False)
+                hots.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
 
-                testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, dtype=trainset_output.dtype, transform=type_transform)
+                testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, testset.classes, dtype=trainset_output.dtype, transform=type_transform)
                 testloader = get_loader(testset_output)
 
                 likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader,results_path,ts_size,testset_output.ordering)
@@ -624,8 +614,8 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
                 results_path_nohomeo = f'../Records/LR_results/{initial_name_nohomeo}_{trial}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
                 hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
-                hots_nohomeo.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter=jitter, verbose=False)
-                testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, dtype=trainset_output.dtype, transform=type_transform)
+                hots_nohomeo.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter=jitter, filtering_threshold = filtering_threshold, verbose=False)
+                testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, testset.classes, dtype=trainset_output.dtype, transform=type_transform)
 
                 scores_jit_histo_nohomeo[trial,ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
                 
