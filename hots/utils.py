@@ -270,7 +270,6 @@ def fit_mlr(loader,
     if os.path.exists(model_path):
         with open(model_path, 'rb') as file:
             classif_layer, mean_loss_epoch = pickle.load(file)
-    
     else:
         criterion = torch.nn.BCELoss(reduction="mean")
         amsgrad = True #or False gives similar results
@@ -537,9 +536,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
         halfsat = (Rmax-Rmin)/2+Rmin
         ind_halfsat = np.where(nr_fit<halfsat)[0]
         x_halfsat = jitter_cont[ind_halfsat[0]]
-
     return fig, ax, x_halfsat
-
 
 def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None, verbose = False):
     
@@ -599,12 +596,12 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
                     testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
                     
                 loader = get_loader(testset, kfold = kfold)
-                hots.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
+                hots.coding(loader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
 
-                testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, testset.classes, dtype=trainset_output.dtype, transform=type_transform)
-                testloader = get_loader(testset_output)
+                testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
+                testloader = get_loader(testset_output, shuffle=False)
 
-                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader,results_path,ts_size,testset_output.ordering)
+                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testloader,results_path,ts_size, testset_output.ordering)
                 meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, verbose=False)
 
                 scores_jit_histo[trial,ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
@@ -614,14 +611,14 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
                 results_path_nohomeo = f'../Records/LR_results/{initial_name_nohomeo}_{trial}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
                 hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
-                hots_nohomeo.coding(loader, trainset_output.ordering, trainset_output.classes, training=False, jitter=jitter, filtering_threshold = filtering_threshold, verbose=False)
-                testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, testset.classes, dtype=trainset_output.dtype, transform=type_transform)
+                hots_nohomeo.coding(loader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold = filtering_threshold, verbose=False)
+                testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
 
                 scores_jit_histo_nohomeo[trial,ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
                 
                 if verbose: 
                     print(f'For {jitter_type} jitter equal to {jitter_val}')
-                    print(f'Online HOTS accuracy: {lastac*100} %')
+                    print(f'Online HOTS accuracy: {lastac*100} % - {meanac*100} %')
                     print(f'Original HOTS accuracy: {scores_jit_histo_nohomeo[trial,ind_jit]*100} %')
                     print(f'HOTS with homeostasis accuracy: {scores_jit_histo[trial,ind_jit]*100} %')
                 
@@ -666,8 +663,12 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
 
     chance_t = np.ones([len(jitter_values)])*100/n_classes
     ax_t.plot(jitter_values,chance_t, 'k--', label='chance level')
-    ax_t.axis([1,max(jitter_values),0,100]);
-    ax_t.set_xlabel('Standard deviation of temporal jitter (in $ms$)', fontsize=16);
+    if jitter_type=='temporal':
+        ax_t.axis([1,max(jitter_values),0,100]);
+        ax_t.set_xlabel('Standard deviation of temporal jitter (in $ms$)', fontsize=16);
+    else:
+        ax_t.axis([0,max(jitter_values),0,100]);
+        ax_t.set_xlabel('Standard deviation of spatial jitter (in $pixels$)', fontsize=16);
     ax_t.set_ylabel('Accuracy (in %)', fontsize=16);
         
     if figure_name:
