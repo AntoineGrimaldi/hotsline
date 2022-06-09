@@ -4,6 +4,7 @@ notebooks/.ipynb_checkpoints/
 hots/__pycache__/
 hots/.ipynb_checkpoints/
 hots/metadata/
+dev/metadata/
 Records/
 dev/.ipynb_checkpoints/
 hots.egg-info/*
