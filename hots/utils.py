@@ -265,7 +265,8 @@ def fit_mlr(loader,
             num_epochs,
             ts_size,
             ordering,
-            n_classes):
+            n_classes,
+            multiple_ts_load = None):
     
     if os.path.exists(model_path):
         with open(model_path, 'rb') as file:
@@ -288,23 +289,44 @@ def fit_mlr(loader,
             losses = np.zeros([len(loader)])
             i = 0
             for events, label in loader:
-                X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device=device)
-                X, label = X.to(device).squeeze(0).to(torch.float32),label.to(device)
-                X = X.reshape(X.shape[0], N)
+                X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device='cpu')
+                if multiple_ts_load:
+                    X = X.squeeze(0)
+                    print(X.shape)
+                    ts_number = (X).shape[0]//multiple_ts_load
+                    for load_nb in range(multiple_ts_load):
+                        X_divided, label_divided = X[load_nb*ts_number:(load_nb+1)*ts_number,:,:,:].to(device).to(torch.float32),label.to(device)
+                        n_events = X_divided.shape[0]
+                        X_divided = X_divided.reshape(n_events, N)
+                        outputs = classif_layer(X_divided)
+                        labels = label_divided*torch.ones(n_events).to(device).to(torch.int64)
+                        labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device).to(torch.float32)
+                        loss = criterion(outputs, labels)
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+                        losses[i] = loss.item()
+                        i += 1
+                        torch.cuda.empty_cache()
+                
+                else:
+                    X, label = X.to(device).squeeze(0).to(torch.float32),label.to(device)
+                    n_events = X.shape[0]
+                    X = X.reshape(n_events, N)
 
-                outputs = classif_layer(X)
+                    outputs = classif_layer(X)
 
-                n_events = X.shape[0]
-                labels = label*torch.ones(n_events).to(device).to(torch.int64)
-                labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device).to(torch.float32)
+                    labels = label*torch.ones(n_events).to(device).to(torch.int64)
+                    labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device).to(torch.float32)
 
-                loss = criterion(outputs, labels)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                losses[i] = loss.item()
-                i += 1
-                torch.cuda.empty_cache()
+                    loss = criterion(outputs, labels)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    losses[i] = loss.item()
+                    i += 1
+                    torch.cuda.empty_cache()
+                    
             mean_loss_epoch.append(losses.mean())
             
         with open(model_path, 'wb') as file:
@@ -594,6 +616,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, num_sample_test, n_classes
                     testset = tonic.datasets.POKERDVS(save_to='../../Data/', train=False, transform=transform_full)
                 elif dataset_name=='nmnist':
                     testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
+                
                     
                 loader = get_loader(testset, kfold = kfold)
                 hots.coding(loader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
