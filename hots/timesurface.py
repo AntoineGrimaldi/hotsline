@@ -1,6 +1,6 @@
 import torch
 
-def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = None, multiple_loads = None, load_number = None, previous_timestamp = None, device="cpu", dtype='torch.float32'):
+def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = None, multiple_loads = None, load_number = None, previous_timesurface = [], device="cpu", dtype='torch.float32'):
     '''with tonic events is loaded in a standardized format: event -> (x,y,t,p) 
     '''
     x_index = ordering.index('x')
@@ -22,23 +22,22 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
         (sensor_size[2], sensor_size[1] + radius_y * 2, sensor_size[0] + radius_x * 2)
     ).to(device)
     
-    if previous_timestamp:
-        timestamp_memory = previous_timestamp
-    else:
-        timestamp_memory -= tau * 3 + 1
-        
     if multiple_loads:
         if not filtering_threshold:
             filtering_threshold = 0
         nb_events = len(events)//multiple_loads
+        if len(previous_timesurface)>0:
+            print(events.shape)
+            timestamp_memory = events[load_number*nb_events-1,t_index] + tau*torch.log(previous_timesurface)
+        else:
+            timestamp_memory -= tau * 3 + 1
         all_surfaces = torch.zeros(
             (nb_events, sensor_size[2], surface_dimensions[1],surface_dimensions[0])).to(device)
-    else: 
-        all_surfaces = torch.zeros(
-            (len(events), sensor_size[2], surface_dimensions[1],surface_dimensions[0])).to(device)
-    if multiple_loads:
         events_list = events[load_number*nb_events:(load_number+1)*nb_events,:]
     else:
+        timestamp_memory -= tau * 3 + 1
+        all_surfaces = torch.zeros(
+            (len(events), sensor_size[2], surface_dimensions[1],surface_dimensions[0])).to(device)
         events_list = events
     for index, event in enumerate(events_list):
         x = int(event[x_index])

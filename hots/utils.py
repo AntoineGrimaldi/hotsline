@@ -45,7 +45,8 @@ def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_fi
     classes = dataset.classes
     targets = dataset.targets
 
-    metadata_path = f'./metadata/{dataset_name}_{int(slicing_time_window*1e-3)}_{only_first}_{train}'
+    metadata_path = f'{dataset.location_on_system}/metadata/{dataset_name}_{int(slicing_time_window*1e-3)}_{only_first}_{train}'
+    print(metadata_path)
 
     if only_first:
         slicer = tonic.slicers.SliceAtTimePoints(start_tw = [0], end_tw = [slicing_time_window])
@@ -196,7 +197,7 @@ class HOTS_Dataset(tonic.dataset.Dataset):
         for path, dirs, files in os.walk(self.location_on_system):
             for file in files:
                 if file.endswith("npy"):
-                    self.data.append(np.load(os.path.join(path, file)))
+                    self.data.append(os.path.join(path, file))
                     n_target = 0
                     indice = path.find(self.classes[n_target])
                     while indice==-1:
@@ -211,8 +212,8 @@ class HOTS_Dataset(tonic.dataset.Dataset):
         Returns:
             a tuple of (events, target) where target is the index of the target class.
         """
-        events, target = self.data[index], self.targets[index]
-        if len(events.shape)>2:
+        events, target = np.load(self.data[index]), self.targets[index]
+        while len(events.shape)>2:
             events = events.squeeze(0)
         events = np.lib.recfunctions.unstructured_to_structured(events, self.dtype)
         if self.transform is not None:
@@ -290,9 +291,10 @@ def fit_mlr(loader,
             i = 0
             for events, label in loader:
                 if multiple_ts_load:
-                    previous_timestamp = None
+                    previous_timestamp = []
                     for load_nb in range(multiple_ts_load):
-                        X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, multiple_loads = multiple_ts_load, load_number = load_nb, previous_timestamp = previous_timestamp)
+                        print(len(previous_timestamp))
+                        X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, multiple_loads = multiple_ts_load, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                         previous_timestamp = X[-1,:,:,:]
                         
                         n_events = X.shape[0]
@@ -300,7 +302,7 @@ def fit_mlr(loader,
 
                         outputs = classif_layer(X)
 
-                        labels = label*torch.ones(n_events).to(device).to(torch.int64)
+                        labels = label.to(device)*torch.ones(n_events).to(device).to(torch.int64)
                         labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device).to(torch.float32)
 
                         loss = criterion(outputs, labels)
