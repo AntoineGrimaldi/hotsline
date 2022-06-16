@@ -291,11 +291,10 @@ def fit_mlr(loader,
             i = 0
             for events, label in loader:
                 if multiple_ts_load:
-                    previous_timestamp = []
+                    previous_timesurface = []
                     for load_nb in range(multiple_ts_load):
-                        print(len(previous_timestamp))
-                        X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, multiple_loads = multiple_ts_load, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
-                        previous_timestamp = X[-1,:,:,:]
+                        X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, multiple_loads = multiple_ts_load, load_number = load_nb, previous_timesurface = previous_timesurface, device = device)
+                        previous_timesurface = X[-1,:,:,:]
                         
                         n_events = X.shape[0]
                         X = X.reshape(n_events, N)
