@@ -310,6 +310,7 @@ def fit_mlr(loader,
                         optimizer.step()
                         losses[i] = loss.item()
                         i += 1
+                        del X, outputs, labels, loss
                         torch.cuda.empty_cache()
                 
                 else:
@@ -329,6 +330,7 @@ def fit_mlr(loader,
                     optimizer.step()
                     losses[i] = loss.item()
                     i += 1
+                    del X, outputs, labels; loss
                     torch.cuda.empty_cache()
                     
             mean_loss_epoch.append(losses.mean())

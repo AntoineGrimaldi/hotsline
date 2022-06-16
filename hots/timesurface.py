@@ -27,7 +27,6 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
             filtering_threshold = 0
         nb_events = len(events)//multiple_loads
         if len(previous_timesurface)>0:
-            print(events.shape)
             timestamp_memory = events[load_number*nb_events-1,t_index] + tau*torch.log(previous_timesurface)
         else:
             timestamp_memory -= tau * 3 + 1
