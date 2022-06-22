@@ -5,13 +5,9 @@
 
 
 ## To do list: 
-- basics notebooks (example with Poker DVS):
-	[x] time surfaces
-	[x] the non supervised network
-	[] the network with the classification layer
 - results notebooks:
-	[] Poker DVS
-	[] N-MNIST
+	[x] Poker DVS
+	[] N-MNIST (jitter)
 	[] DVS Gesture
 - optional:
 	[] ASL-DVS
