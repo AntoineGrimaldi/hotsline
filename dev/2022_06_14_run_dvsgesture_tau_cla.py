@@ -10,7 +10,7 @@ for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
     
     
-kfold_test = 2
+kfold_test = 10
 kfold_clust = 10
 
 dataset_name = 'gesture'
@@ -56,7 +56,7 @@ betas = (beta1, beta2)
 num_epochs = 8 #2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [1e5, 2e5, 3e5, 5e5, 1e6, 2e6]
+tau_cla_list = [5e4, 7e4, 1e5, 2e5, 3e5, 5e5, 1e6]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -64,17 +64,20 @@ test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)
 
-trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
+drop_proba = .5
+drop_transform = tonic.transforms.DropEvent(p = drop_proba)
+
+trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
 trainoutputloader = get_loader(trainset_output)
-testset_output = HOTS_Dataset(test_path, testset.sensor_size, testset.classes, dtype=testset.dtype, transform=type_transform)
+testset_output = HOTS_Dataset(test_path, testset.sensor_size, testset.classes, dtype=testset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
 testoutputloader = get_loader(testset_output)
 
 for tau_cla in tau_cla_list:
-    
+
     model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
     results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
     
     classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), multiple_ts_load = 100)
-    likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering)
+    likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering,  multiple_ts_load = 100)
     meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, original_accuracy = score, original_accuracy_nohomeo = score_nohomeo, figure_name = 'nmnist_online.pdf')
     print(f'For tau = {tau} last accuracy: {lastac*100}% - mean accuracy: {meanac*100}%')
