@@ -12,6 +12,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 kfold_test = 10
 kfold_clust = 10
+multiple_ts_load = 100
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -72,12 +73,15 @@ trainoutputloader = get_loader(trainset_output)
 testset_output = HOTS_Dataset(test_path, testset.sensor_size, testset.classes, dtype=testset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
 testoutputloader = get_loader(testset_output)
 
+score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
+score_nohomeo = 0
+
 for tau_cla in tau_cla_list:
 
     model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
     results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
     
-    classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), multiple_ts_load = 100)
-    likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering,  multiple_ts_load = 100)
+    classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), multiple_ts_load = multiple_ts_load)
+    likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering,  multiple_ts_load = multiple_ts_load)
     meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, original_accuracy = score, original_accuracy_nohomeo = score_nohomeo, figure_name = 'nmnist_online.pdf')
-    print(f'For tau = {tau} last accuracy: {lastac*100}% - mean accuracy: {meanac*100}%')
+    print(f'For tau = {tau_cla} last accuracy: {lastac*100}% - mean accuracy: {meanac*100}%')

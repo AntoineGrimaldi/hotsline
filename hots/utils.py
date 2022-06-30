@@ -17,7 +17,6 @@ def printfig(fig, name):
 def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, batch_size = 1, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
     # then the dataset is splitted into different folds with equal repartition of the classes.
-    
     classes = dataset.classes
     targets = dataset.targets
     
