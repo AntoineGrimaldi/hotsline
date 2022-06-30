@@ -265,7 +265,8 @@ def fit_mlr(loader,
             ts_size,
             ordering,
             n_classes,
-            multiple_ts_load = None):
+            multiple_ts_load = None,
+            device = None):
     
     if os.path.exists(model_path):
         with open(model_path, 'rb') as file:
@@ -273,7 +274,8 @@ def fit_mlr(loader,
     else:
         criterion = torch.nn.BCELoss(reduction="mean")
         amsgrad = True #or False gives similar results
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if not device:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f'device -> {device}')
         
         N = ts_size[0]*ts_size[1]*ts_size[2]

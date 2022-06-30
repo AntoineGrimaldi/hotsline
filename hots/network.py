@@ -19,6 +19,7 @@ class network(object):
                         homeo = True, # parameters for homeostasis (None is no homeo rule)
                         snn_analogy = False,
                         to_record = False,
+                        device = None,
                 ):
         assert len(nb_neurons) == len(R) & len(nb_neurons) == len(tau)
         
@@ -32,8 +33,8 @@ class network(object):
         self.tau = tau
         self.R = R
         
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f'device -> {device}')
+        if not device:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         path = '../Records/networks/'+self.name+'.pkl'
         if os.path.exists(path):
