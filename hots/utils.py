@@ -264,7 +264,7 @@ def fit_mlr(loader,
             ts_size,
             ordering,
             n_classes,
-            multiple_ts_load = None,
+            ts_batch_size = None,
             device = None):
     
     if os.path.exists(model_path):
@@ -287,18 +287,19 @@ def fit_mlr(loader,
 
         mean_loss_epoch = []
         for epoch in tqdm(range(int(num_epochs))):
-            if multiple_ts_load:
-                losses = np.zeros([len(loader)*multiple_ts_load])
+            if ts_batch_size:
+                losses = np.zeros([len(loader)*ts_batch_size])
             else:
                 losses = np.zeros([len(loader)])
             i = 0
             for events, label in loader:
-                if multiple_ts_load:
+                events = events.squeeze(0)
+                if ts_batch_size:
+                    nb_batch = len(events)//ts_batch_size+1
                     previous_timesurface = []
-                    for load_nb in range(multiple_ts_load):
-                        X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, multiple_loads = multiple_ts_load, load_number = load_nb, previous_timesurface = previous_timesurface, device = device)
+                    for load_nb in range(nb_batch):
+                        X, ind_filtered = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timesurface = previous_timesurface, device = device)
                         previous_timesurface = X[-1,:,:,:]
-                        
                         n_events = X.shape[0]
                         X = X.reshape(n_events, N)
 
@@ -317,8 +318,8 @@ def fit_mlr(loader,
                         torch.cuda.empty_cache()
                 
                 else:
-                    X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla)
-                    X, label = X.to(device).squeeze(0).to(torch.float32),label.to(device)
+                    X, ind_filtered = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device = device)
+                    X, label = X, label.to(device)
                     n_events = X.shape[0]
                     X = X.reshape(n_events, N)
 
@@ -349,7 +350,7 @@ def predict_mlr(mlrlayer,
                 results_path,
                 timesurface_size,
                 ordering,
-                multiple_ts_load = None
+                ts_batch_size = None
         ):    
     
     if os.path.isfile(results_path):
@@ -362,7 +363,7 @@ def predict_mlr(mlrlayer,
         initial_memory = copy.copy(torch.cuda.memory_allocated())
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f'device -> {device}')
+        #print(f'device -> {device}')
 
         classif_layer = mlrlayer.to(device)
         
@@ -377,22 +378,22 @@ def predict_mlr(mlrlayer,
                 timestamps.append(events[:,t_index])
                 if events.shape[1]==0:
                     outputs = torch.Tensor([])
-                elif multiple_ts_load:
+                elif ts_batch_size:
+                    nb_batch = len(events)//ts_batch_size+1
                     previous_timesurface = []
                     outputs = torch.Tensor([]).to(device)
-                    for load_nb in range(multiple_ts_load):
-                        X, ind_filtered = timesurface(events.squeeze(0).squeeze(0), (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, multiple_loads = multiple_ts_load, load_number = load_nb, previous_timesurface = previous_timesurface, device = device)
+                    for load_nb in range(nb_batch):
+                        X, ind_filtered = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timesurface = previous_timesurface, device = device)
                         previous_timesurface = X[-1,:,:,:]
                         n_events = X.shape[0]
-                        X, label = X.to(device).squeeze(0).to(torch.float32), label.to(device)
+                        X, label = X, label.to(device)
                         X = X.reshape(n_events, N)
                         outputs_splitted = classif_layer(X)
                         outputs = torch.hstack([outputs,outputs_splitted])
-                        print(outputs, label)
                 else:
                     X, ind_filtered = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
                     n_events = X.shape[0]
-                    X, label = X.to(device).squeeze(0).to(torch.float32), label.to(device)
+                    X, label = X, label.to(device)
                     X = X.reshape(n_events, N)
                     outputs = classif_layer(X)
                 likelihood.append(outputs.cpu().numpy())
