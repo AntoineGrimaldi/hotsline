@@ -307,7 +307,7 @@ def fit_mlr(loader,
 
                         labels = label.to(device)*torch.ones(n_events).to(device).to(torch.int64)
                         labels = torch.nn.functional.one_hot(labels, num_classes=n_classes).to(device).to(torch.float32)
-
+                        
                         loss = criterion(outputs, labels)
                         optimizer.zero_grad()
                         loss.backward()
@@ -316,7 +316,6 @@ def fit_mlr(loader,
                         i += 1
                         del X, outputs, labels, loss
                         torch.cuda.empty_cache()
-                
                 else:
                     X, ind_filtered = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device = device)
                     X, label = X, label.to(device)
@@ -334,7 +333,7 @@ def fit_mlr(loader,
                     optimizer.step()
                     losses[i] = loss.item()
                     i += 1
-                    del X, outputs, labels; loss
+                    del X, outputs, labels, loss
                     torch.cuda.empty_cache()
                     
             mean_loss_epoch.append(losses.mean())
@@ -389,7 +388,7 @@ def predict_mlr(mlrlayer,
                         X, label = X, label.to(device)
                         X = X.reshape(n_events, N)
                         outputs_splitted = classif_layer(X)
-                        outputs = torch.hstack([outputs,outputs_splitted])
+                        outputs = torch.vstack([outputs,outputs_splitted]) if outputs.shape[0]>0 else outputs_splitted
                 else:
                     X, ind_filtered = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
                     n_events = X.shape[0]
@@ -398,6 +397,7 @@ def predict_mlr(mlrlayer,
                     outputs = classif_layer(X)
                 likelihood.append(outputs.cpu().numpy())
                 true_target.append(label.cpu().numpy())
+                del X, outputs
                 torch.cuda.empty_cache()
             with open(results_path, 'wb') as file:
                 pickle.dump([likelihood, true_target, timestamps], file, pickle.HIGHEST_PROTOCOL)

@@ -12,7 +12,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 kfold_test = 10
 kfold_clust = 10
-ts_batch_size = 3000
+ts_batch_size = 2000
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
