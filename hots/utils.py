@@ -720,3 +720,5 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
         printfig(fig, figure_name)
     
     return jitter_values, scores_jit, scores_jit_histo, scores_jit_histo_nohomeo
+
+
