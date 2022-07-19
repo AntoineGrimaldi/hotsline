@@ -9,10 +9,9 @@ print(f'Number of GPU devices available: {torch.cuda.device_count()}')
 for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
     
-    
 kfold_test = 10
 kfold_clust = 10
-ts_batch_size = 2000
+ts_batch_size = 1000
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6

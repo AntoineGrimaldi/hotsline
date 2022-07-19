@@ -59,7 +59,7 @@ betas = (beta1, beta2)
 num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [5e5, 1e6, 2e6, 3e6, 5e6, 1e7]
+tau_cla_list = [2e7, 3e7, 4e7, 5e7, 1e8, 2e8]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -79,6 +79,8 @@ if drop_events_mlr:
     drop_transform = tonic.transforms.DropEvent(p = drop_proba)
     trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
 
+score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
+score_nohomeo = 0
     
 for tau_cla in tau_cla_list:
     model_path = f'../Records/networks/{hots.name}_{tau_cla}_{num_sample_train}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
