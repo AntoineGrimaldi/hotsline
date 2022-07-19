@@ -11,7 +11,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 kfold_test = 10
 kfold_clust = 10
-ts_batch_size = 1000
+ts_batch_size = 800
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -56,7 +56,7 @@ betas = (beta1, beta2)
 num_epochs = 8#2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [1e6, 2e6, 3e6, 4e6, 5e6, 7e6, 1e7]
+tau_cla_list = [1e7, 2e7, 3e7, 5e7, 7e7, 1e8]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -64,7 +64,7 @@ test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)
 
-drop_proba = .5
+drop_proba = .9
 drop_transform = tonic.transforms.DropEvent(p = drop_proba)
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
