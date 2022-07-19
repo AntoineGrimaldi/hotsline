@@ -252,8 +252,7 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
             if inference==label:
                 score+=1
     score/=len(testset)
-    return score
-        
+    return score  
 
 def fit_mlr(loader, 
             model_path,
@@ -321,7 +320,7 @@ def fit_mlr(loader,
                     X, label = X, label.to(device)
                     n_events = X.shape[0]
                     X = X.reshape(n_events, N)
-
+                    
                     outputs = classif_layer(X)
 
                     labels = label*torch.ones(n_events).to(device).to(torch.int64)
@@ -333,6 +332,7 @@ def fit_mlr(loader,
                     optimizer.step()
                     losses[i] = loss.item()
                     i += 1
+                    
                     del X, outputs, labels, loss
                     torch.cuda.empty_cache()
                     
@@ -369,7 +369,6 @@ def predict_mlr(mlrlayer,
         with torch.no_grad():
             # needed for previous versions, now it should be ok to remove it
             classif_layer.linear = classif_layer.linear.float()
-            
             likelihood, true_target, timestamps = [], [], []
 
             for events, label in tqdm(loader):
@@ -439,7 +438,7 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
             if pred_target==true_target_:
                 lastac+=1
         sample+=1
-
+    
     if matscor.shape[1]==0:
         meanac = 1/n_classes
         onlinac = 1/n_classes

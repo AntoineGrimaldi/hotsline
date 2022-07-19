@@ -57,7 +57,7 @@ betas = (beta1, beta2)
 num_epochs = 8#2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [5e4, 7e4, 1e5, 2e5, 3e5, 5e5, 1e6]
+tau_cla_list = [1e6, 2e6, 3e6, 4e6, 5e6, 7e6, 1e7]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
