@@ -9,11 +9,9 @@ print(f'Number of GPU devices available: {torch.cuda.device_count()}')
 for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
     
-#device = "cpu"
+device = "cpu"
     
-drop_events_mlr = True
-drop_proba = .5
-
+drop_proba_mlr = None
 kfold = None
 
 type_transform = tonic.transforms.NumpyAsType(int)
@@ -63,7 +61,7 @@ betas = (beta1, beta2)
 num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla = 5e4
+tau_cla = 1.7e7
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -97,9 +95,9 @@ score_nohomeo = make_histogram_classification(trainset_output_nohomeo, testset_o
 
 print(f'Histogram accuracy with homeo: {score*100}% - without homeo: {score_nohomeo*100}%')
 
-if drop_events_mlr:
-    drop_transform = tonic.transforms.DropEvent(p = drop_proba)
-    trainset_output_nohomeo = HOTS_Dataset(train_path_nohomeo, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
+if drop_proba_mlr:
+    drop_transform = tonic.transforms.DropEvent(p = drop_proba_mlr)
+    trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
 
 model_path = f'../Records/networks/{hots.name}_{tau_cla}_{num_sample_train}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
@@ -111,6 +109,8 @@ print(f'for tau cla: {tau_cla} - last accuracy: {lastac*100}% - mean accuracy: {
 kfold_jitter = 10
 nb_trials = 1
 nb_points = 20
+
+trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 
 standard_spatial_jitter_min = 0
 standard_spatial_jitter_max = 10

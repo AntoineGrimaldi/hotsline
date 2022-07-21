@@ -1,6 +1,6 @@
 import torch
 
-def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = None, ts_batch_size = None, load_number = None, previous_timesurface = [], device="cpu", dtype='torch.float32'):
+def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = 1, ts_batch_size = None, load_number = None, previous_timesurface = [], device="cpu", dtype='torch.float32'):
     '''with tonic events is loaded in a standardized format: event -> (x,y,t,p) 
     '''
     x_index = ordering.index('x')
@@ -23,8 +23,6 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     ).to(device)
     
     if ts_batch_size:
-        if not filtering_threshold:
-            filtering_threshold = 0
         nb_full_batch = len(events)//ts_batch_size
         if len(previous_timesurface)>0:
             timestamp_memory = events[load_number*ts_batch_size-1,t_index] + tau*torch.log(previous_timesurface)

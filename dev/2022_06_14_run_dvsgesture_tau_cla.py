@@ -50,13 +50,13 @@ if not os.path.exists(path):
     
 jitter = (None, None)
 num_workers = 0
-learning_rate = 0.005
+learning_rate = 0.0001
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
 num_epochs = 8#2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [1e7, 2e7, 3e7, 5e7, 7e7, 1e8]
+tau_cla_list = [5e6, 1e7, 2e7, 3e7, 5e7, 7e7, 1e8]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
