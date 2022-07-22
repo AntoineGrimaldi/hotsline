@@ -9,9 +9,9 @@ print(f'Number of GPU devices available: {torch.cuda.device_count()}')
 for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
     
-device = "cpu"
+device = "cuda"
     
-drop_proba_mlr = None
+drop_proba_mlr = .1
 kfold = None
 
 type_transform = tonic.transforms.NumpyAsType(int)
