@@ -9,9 +9,9 @@ print(f'Number of GPU devices available: {torch.cuda.device_count()}')
 for N_gpu in range(torch.cuda.device_count()):
     print(f'GPU {N_gpu+1} named {torch.cuda.get_device_name(N_gpu)}')
     
-kfold_test = 10
+kfold_test = None
 kfold_clust = 10
-ts_batch_size = 800
+ts_batch_size = 1000
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -53,10 +53,10 @@ num_workers = 0
 learning_rate = 0.0001
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
-num_epochs = 8#2 ** 5 + 1
+num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [1.5e8, 1.7e8, 1.9e8, 2.1e8, 2.3e8, 2.5e8]
+tau_cla_list = [2e8]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -69,7 +69,7 @@ drop_transform = tonic.transforms.DropEvent(p = drop_proba)
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
 trainoutputloader = get_loader(trainset_output)
-testset_output = HOTS_Dataset(test_path, testset.sensor_size, testset.classes, dtype=testset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
+testset_output = HOTS_Dataset(test_path, testset.sensor_size, testset.classes, dtype=testset.dtype, transform=type_transform)
 testoutputloader = get_loader(testset_output)
 
 score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
