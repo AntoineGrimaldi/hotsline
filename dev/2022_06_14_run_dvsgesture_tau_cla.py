@@ -64,10 +64,13 @@ test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)
 
-drop_proba = .9
-drop_transform = tonic.transforms.DropEvent(p = drop_proba)
+drop_proba = None
+if drop_proba:
+    drop_transform = tonic.transforms.DropEvent(p = drop_proba)
+    full_drop_transform = tonic.transforms.Compose([drop_transform, type_transform])
+else: full_drop_transform = type_transform
 
-trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
+trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=full_drop_transform)
 trainoutputloader = get_loader(trainset_output)
 testset_output = HOTS_Dataset(test_path, testset.sensor_size, testset.classes, dtype=testset.dtype, transform=type_transform)
 testoutputloader = get_loader(testset_output)
@@ -77,8 +80,8 @@ score_nohomeo = 0
 
 for tau_cla in tau_cla_list:
 
-    model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
-    results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+    model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
+    results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
     print(f'Number of samples in the trainset set: {len(trainoutputloader)}')
     
     classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), ts_batch_size = ts_batch_size)
