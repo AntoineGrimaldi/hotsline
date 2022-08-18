@@ -713,7 +713,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     fig_t, ax_t = plt.subplots(1,1,figsize=(8,5))
     colorz = ['#2ca02c','#1f77b4','#d62728']
     label = 'online HOTS (ours)'
-    param_T = [.99, 1/n_classes, 20, 1] # to change to adjust the fit
+    param_T = [.99, 1/n_classes, 4, .5] # to change to adjust the fit
     n_epoch = 33
 
     fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit, param = param_T, color=colorz[1], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)
