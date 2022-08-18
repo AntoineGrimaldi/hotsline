@@ -385,7 +385,8 @@ def predict_mlr(mlrlayer,
         
         with torch.no_grad():
             # needed for previous versions, now it should be ok to remove it
-            classif_layer.linear = classif_layer.linear.float()
+            classif_layer.linear = classif_layer.linear.double()
+            #print(classif_layer.linear.weight.dtype)
             likelihood, true_target, timestamps = [], [], []
 
             for events, label in tqdm(loader):
@@ -434,25 +435,29 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
     matscor[:] = np.nan
     sample = 0
     lastac = 0
-    nancount = 0
     nb_test = len(true_target)
+    nb_events = np.zeros([nb_test])
+    nb_no_decision = 0
 
     for likelihood_, true_target_ in zip(likelihood, true_target):
-        if len(likelihood_)!=0:
-            pred_target = np.zeros(len(likelihood_))
+        nb_event_sample = len(likelihood_)
+        nb_events[sample] = nb_event_sample
+        if nb_event_sample!=0:
+            pred_target = np.zeros(nb_event_sample)
             pred_target[:] = np.nan
             if not thres:
                 pred_target = np.argmax(likelihood_, axis = 1)
             else:
-                for i in range(len(likelihood_)):
+                for i in range(nb_event_sample):
                     if np.max(likelihood_[i])>thres:
                         pred_target[i] = np.argmax(likelihood_[i])
-            for event in range(len(pred_target)):
+            for event in range(nb_event_sample):
                 if np.isnan(pred_target[event])==False:
                     matscor[sample,event] = pred_target[event]==true_target_
             if pred_target[-1]==true_target_:
                 lastac+=1
         else:
+            nb_no_decision += 1
             pred_target = np.random.randint(0,n_classes)
             matscor[sample,:] = pred_target==true_target_
             if pred_target==true_target_:
@@ -468,7 +473,9 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
         onlinac = np.nanmean(matscor, axis=0)
         lastac/=nb_test
 
-    if verbose:
+    if verbose:    
+        print(f'Number of chance decisions: {nb_no_decision}')
+        print(f'90th quantile for number of events: {np.quantile(nb_events, .9)}')
         print(f'Mean accuracy: {np.round(meanac,3)*100}%')
         fig, ax = plt.subplots()
         sampling = (np.logspace(0,np.log10(max_len),100)).astype(int)
@@ -666,7 +673,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
-
+                
                 likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering)
                 meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, verbose=False)
 

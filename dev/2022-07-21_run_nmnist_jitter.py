@@ -51,7 +51,7 @@ if not os.path.exists(path):
     hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
 path_nohomeo = '../Records/networks/'+hots_nohomeo.name+'.pkl'
 if not os.path.exists(path_nohomeo):
-    hots_nohomeo.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold) 
+    hots_nohomeo.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
     
 jitter = (None, None)
 num_workers = 0
@@ -87,13 +87,13 @@ testoutputloader = get_loader(testset_output)
 trainset_output_nohomeo = HOTS_Dataset(train_path_nohomeo, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset.sensor_size, testset.classes, dtype=trainset.dtype, transform=type_transform)
 
-print(f'number of samples in the training set: {len(trainoutputloader)}')
-print(f'number of samples in the testing set: {len(testoutputloader)}')
+#print(f'number of samples in the training set: {len(trainoutputloader)}')
+#print(f'number of samples in the testing set: {len(testoutputloader)}')
 
-score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
-score_nohomeo = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, N_neuronz[-1])
+#score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
+#score_nohomeo = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, N_neuronz[-1])
 
-print(f'Histogram accuracy with homeo: {score*100}% - without homeo: {score_nohomeo*100}%')
+#print(f'Histogram accuracy with homeo: {score*100}% - without homeo: {score_nohomeo*100}%')
 
 if drop_proba_mlr:
     drop_transform = tonic.transforms.DropEvent(p = drop_proba_mlr)
@@ -102,12 +102,12 @@ if drop_proba_mlr:
 model_path = f'../Records/networks/{hots.name}_{tau_cla}_{num_sample_train}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), device = device)
-likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering)
-meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, original_accuracy = score, original_accuracy_nohomeo = score_nohomeo, figure_name = 'nmnist_online.pdf')
-print(f'for tau cla: {tau_cla} - last accuracy: {lastac*100}% - mean accuracy: {meanac*100}%')
+#likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering)
+#meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, original_accuracy = score, original_accuracy_nohomeo = score_nohomeo)#, figure_name = 'nmnist_online.pdf')
+#print(f'for tau cla: {tau_cla} - last accuracy: {lastac*100}% - mean accuracy: {meanac*100}%')
 
 kfold_jitter = 10
-nb_trials = 1
+nb_trials = 10
 nb_points = 20
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)

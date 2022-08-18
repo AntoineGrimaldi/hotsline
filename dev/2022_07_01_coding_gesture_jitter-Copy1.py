@@ -98,7 +98,6 @@ print(f'number of samples in the testing set: {len(testloader)}')
 name = 'homeohots'
 homeo = True
 timestr = '2022-04-22'
-dataset_name = 'gesture'
 
 Rz = [4, 8]
 N_neuronz = [16, 32]
@@ -124,32 +123,42 @@ path_nohomeo = '../Records/networks/'+hots_nohomeo.name+'.pkl'
 if not os.path.exists(path_nohomeo):
     hots_nohomeo.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
 
-jitter = (None, None)
-num_workers = 0
-learning_rate = 0.0001
-beta1, beta2 = 0.9, 0.999
-betas = (beta1, beta2)
-num_epochs = 2 ** 5 + 1
-N_output_neurons = N_neuronz[-1]
-ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla = 2e8
-drop_proba = .9
+hots.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True, verbose=False)
+hots.coding(testloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=False, verbose=False)
+
+hots_nohomeo.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True, verbose=False)
+hots_nohomeo.coding(testloader, testset.ordering, testset.classes, filtering_threshold = filtering_threshold, training=False, verbose=False)
+
+print('coding -> done')
+
+jitter = None
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
-model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
-results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 
-kfold_jitter = 5
-nb_trials = 1
-nb_points = 5
+trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
+testset_output = HOTS_Dataset(test_path, trainset.sensor_size, testset.classes, dtype=trainset.dtype, transform=type_transform)
 
-trainset_output_jitter = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
+train_path_nohomeo = f'../Records/output/train/{hots_nohomeo.name}_{num_sample_train}_{jitter}/'
+test_path_nohomeo = f'../Records/output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
 
-standard_spatial_jitter_min = 0
-standard_spatial_jitter_max = 10
-run_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
+trainset_output_nohomeo = HOTS_Dataset(train_path_nohomeo, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
+testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset.sensor_size, testset.classes, dtype=trainset.dtype, transform=type_transform)
+
+score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
+score_nohomeo = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, N_neuronz[-1])
+
+print(f'Histogram accuracy with homeo: {score*100}% - without homeo: {score_nohomeo*100}%')
+
+
+kfold_jitter = 2
+nb_trials = 10
+nb_points = 20
 
 standard_temporal_jitter_min = 3
 standard_temporal_jitter_max = 7
-run_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
+run_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', hots, hots_nohomeo, dataset_name, trainset_output, filtering_threshold = filtering_threshold, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
+
+standard_spatial_jitter_min = 0
+standard_spatial_jitter_max = 10
+run_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, dataset_name, trainset_output, filtering_threshold = filtering_threshold, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
