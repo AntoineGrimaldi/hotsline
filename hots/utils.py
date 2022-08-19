@@ -611,6 +611,8 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
 
 def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None, verbose = False):
     
+    mlr_threshold = .99
+    
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
     
@@ -675,10 +677,10 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 test_outputloader = get_loader(testset_output, shuffle=False)
                 
                 likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering)
-                meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, verbose=False)
+                meanac, onlinac, lastac = score_classif_events(likelihood, true_target, n_classes, thres = mlr_threshold, verbose=False)
 
                 scores_jit_histo[trial,ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
-                scores_jit[trial,ind_jit] = lastac
+                scores_jit[trial,ind_jit] = meanac
 
                 hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
