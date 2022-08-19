@@ -37,7 +37,7 @@ def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=Tr
         #loader = torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers = num_workers, batch_size=batch_size, collate_fn=tonic.collation.PadTensors(batch_first=True))
     return loader
 
-def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_first = True, kfold = None, kfold_ind = 0, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True, seed=42):
+def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_first = True, kfold = None, kfold_ind = 0, transform = tonic.transforms.NumpyAsType(int), num_workers = 0, shuffle=True, seed=43):
     
     classes = dataset.classes
     targets = dataset.targets

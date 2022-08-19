@@ -42,6 +42,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     for index, event in enumerate(events_list):
         x = int(event[x_index])
         y = int(event[y_index])
+
         timestamp_memory[int(event[p_index]), y + radius_y, x + radius_x] = event[t_index]
         
         if radius_x > 0 and radius_y > 0:
