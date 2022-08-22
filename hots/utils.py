@@ -251,6 +251,8 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
             inference = torch.bincount(label_sorted[:k]).argmax()
             if inference==label:
                 score+=1
+        else:
+            inference = np.random.randint(0,len(trainset.classes))
     score/=len(testset)
     return score  
 
@@ -672,6 +674,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 
                 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
                 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
+                print(results_path, test_path)
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
@@ -691,7 +694,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 
                 if verbose: 
                     print(f'For {jitter_type} jitter equal to {jitter_val}')
-                    print(f'Online HOTS accuracy: {lastac*100} % - {meanac*100} %')
+                    print(f'Online HOTS accuracy: {meanac*100} %')
                     print(f'Original HOTS accuracy: {scores_jit_histo_nohomeo[trial,ind_jit]*100} %')
                     print(f'HOTS with homeostasis accuracy: {scores_jit_histo[trial,ind_jit]*100} %')
                 
