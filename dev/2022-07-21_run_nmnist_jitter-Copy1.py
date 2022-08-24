@@ -11,7 +11,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 device = "cuda"
     
-drop_proba_mlr = None
+drop_proba_mlr = .5
 kfold = None
 
 type_transform = tonic.transforms.NumpyAsType(int)
@@ -61,7 +61,7 @@ betas = (beta1, beta2)
 num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla = 1.7e7
+tau_cla = 5e4
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
