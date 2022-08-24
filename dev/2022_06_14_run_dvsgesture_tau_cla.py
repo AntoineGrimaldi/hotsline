@@ -53,10 +53,10 @@ num_workers = 0
 learning_rate = 0.0001
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
-num_epochs = 2 ** 5 + 1
+num_epochs = 11#2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [2e8]
+tau_cla_list = [1e4, 1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -66,25 +66,31 @@ print(hots.name)
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)
 
-drop_proba = None
+drop_proba = .9
 if drop_proba:
     drop_transform = tonic.transforms.DropEvent(p = drop_proba)
     full_drop_transform = tonic.transforms.Compose([drop_transform, type_transform])
 else: full_drop_transform = type_transform
 
+kfold_mlr = 10
+
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=full_drop_transform)
-trainoutputloader = get_loader(trainset_output)
+trainoutputloader = get_loader(trainset_output, kfold = kfold_mlr)
 testset_output = HOTS_Dataset(test_path, testset.sensor_size, testset.classes, dtype=testset.dtype, transform=type_transform)
-testoutputloader = get_loader(testset_output)
+testoutputloader = get_loader(testset_output, kfold = kfold_mlr)
 
 score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
-score_nohomeo = 0
+score_nohomeo = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
+
+print(score, score_nohomeo)
 
 for tau_cla in tau_cla_list:
 
     model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
     results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
     print(f'Number of samples in the trainset set: {len(trainoutputloader)}')
+    
+    print(len(trainoutputloader))
     
     classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), ts_batch_size = ts_batch_size)
     likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering,  ts_batch_size = ts_batch_size)
