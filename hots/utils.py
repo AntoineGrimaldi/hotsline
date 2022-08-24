@@ -253,6 +253,9 @@ def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
                 score+=1
         else:
             inference = np.random.randint(0,len(trainset.classes))
+            if inference==label:
+                score+=1
+            
     score/=len(testset)
     return score  
 
@@ -440,11 +443,14 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
     nb_test = len(true_target)
     nb_events = np.zeros([nb_test])
     nb_no_decision = 0
+    best_probability = 0
 
     for likelihood_, true_target_ in zip(likelihood, true_target):
         nb_event_sample = len(likelihood_)
         nb_events[sample] = nb_event_sample
         if nb_event_sample!=0:
+            if np.where(likelihood_==np.max(likelihood_))[1][0]==true_target_:
+                best_probability += 1
             pred_target = np.zeros(nb_event_sample)
             pred_target[:] = np.nan
             if not thres:
@@ -458,7 +464,14 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
                     matscor[sample,event] = pred_target[event]==true_target_
             if pred_target[-1]==true_target_:
                 lastac+=1
-        else:
+            if np.sum(np.isnan(pred_target))==nb_event_sample:
+                nb_no_decision += 1
+                pred_target = np.random.randint(0,n_classes)
+                matscor[sample,:] = pred_target==true_target_
+                if pred_target==true_target_:
+                    lastac+=1
+                    
+        else: 
             nb_no_decision += 1
             pred_target = np.random.randint(0,n_classes)
             matscor[sample,:] = pred_target==true_target_
@@ -474,13 +487,16 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
         meanac = np.nanmean(matscor)
         onlinac = np.nanmean(matscor, axis=0)
         lastac/=nb_test
+        best_probability/=nb_test
 
     if verbose:    
         print(f'Number of chance decisions: {nb_no_decision}')
         print(f'90th quantile for number of events: {np.quantile(nb_events, .9)}')
         print(f'Mean accuracy: {np.round(meanac,3)*100}%')
+        print(f'Last accuracy: {np.round(lastac,3)*100}%')
+        print(f'Highest probability accuracy: {np.round(best_probability,3)*100}%')
         fig, ax = plt.subplots()
-        sampling = (np.logspace(0,np.log10(max_len),100)).astype(int)
+        sampling = (np.logspace(0,np.log10(np.quantile(nb_events, .9)),100)).astype(int)
         ax.semilogx(sampling[:-1],onlinac[sampling[:-1]]*100, '.', label='online HOTS (ours)');
         ax.hlines(1/n_classes*100,0,int(max_len), linestyles='dashed', color='k', label='chance level')
         if original_accuracy:
