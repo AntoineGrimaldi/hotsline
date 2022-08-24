@@ -390,7 +390,7 @@ def predict_mlr(mlrlayer,
         
         with torch.no_grad():
             # needed for previous versions, now it should be ok to remove it
-            classif_layer.linear = classif_layer.linear#.double()
+            classif_layer.linear = classif_layer.linear.double()
             #print(classif_layer.linear.weight.dtype)
             likelihood, true_target, timestamps = [], [], []
 
@@ -469,8 +469,7 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
                 pred_target = np.random.randint(0,n_classes)
                 matscor[sample,:] = pred_target==true_target_
                 if pred_target==true_target_:
-                    lastac+=1
-                    
+                    lastac+=1    
         else: 
             nb_no_decision += 1
             pred_target = np.random.randint(0,n_classes)
@@ -764,7 +763,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     ax_t.set_ylabel('Accuracy (in %)', fontsize=16);
         
     if figure_name:
-        printfig(fig, figure_name)
+        printfig(fig_t, figure_name)
     
     return jitter_values, scores_jit, scores_jit_histo, scores_jit_histo_nohomeo
 
