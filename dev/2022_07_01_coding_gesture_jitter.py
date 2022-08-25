@@ -140,9 +140,9 @@ test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
 model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
 
-kfold_jitter = 5
-nb_trials = 1
-nb_points = 5
+kfold_jitter = 2
+nb_trials = 10
+nb_points = 10
 
 trainset_output_jitter = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 

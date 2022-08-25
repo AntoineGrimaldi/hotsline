@@ -66,7 +66,7 @@ print(hots.name)
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)
 
-drop_proba = .9
+drop_proba = .5
 if drop_proba:
     drop_transform = tonic.transforms.DropEvent(p = drop_proba)
     full_drop_transform = tonic.transforms.Compose([drop_transform, type_transform])
