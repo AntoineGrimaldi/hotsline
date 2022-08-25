@@ -53,10 +53,10 @@ num_workers = 0
 learning_rate = 0.0001
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
-num_epochs = 11#2 ** 5 + 1
+num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [1e4, 1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8]
+tau_cla_list = [5e5]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -72,7 +72,7 @@ if drop_proba:
     full_drop_transform = tonic.transforms.Compose([drop_transform, type_transform])
 else: full_drop_transform = type_transform
 
-kfold_mlr = 10
+kfold_mlr = None
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=full_drop_transform)
 trainoutputloader = get_loader(trainset_output, kfold = kfold_mlr)
@@ -86,8 +86,8 @@ print(score, score_nohomeo)
 
 for tau_cla in tau_cla_list:
 
-    model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
-    results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{jitter}_{drop_proba}.pkl'
+    model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
+    results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
     print(f'Number of samples in the trainset set: {len(trainoutputloader)}')
     
     print(len(trainoutputloader))
