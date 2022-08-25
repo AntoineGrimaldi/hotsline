@@ -429,7 +429,7 @@ def predict_mlr(mlrlayer,
 
     return likelihood, true_target, timestamps
 
-def score_classif_events(likelihood, true_target, n_classes, thres=None, original_accuracy = None, original_accuracy_nohomeo = None, verbose=True, figure_name=False):
+def score_classif_events(likelihood, true_target, n_classes, thres=None, original_accuracy = None, original_accuracy_nohomeo = None, online_acc=True, psycho=False, figure_name=False):
     
     max_len = 0
     for likeli in likelihood:
@@ -487,13 +487,14 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
         onlinac = np.nanmean(matscor, axis=0)
         lastac/=nb_test
         best_probability/=nb_test
+        
+    print(f'Number of chance decisions: {nb_no_decision}')
+    print(f'90th quantile for number of events: {np.quantile(nb_events, .9)}')
+    print(f'Mean accuracy: {np.round(meanac,3)*100}%')
+    print(f'Last accuracy: {np.round(lastac,3)*100}%')
+    print(f'Highest probability accuracy: {np.round(best_probability,3)*100}%')
 
-    if verbose:    
-        print(f'Number of chance decisions: {nb_no_decision}')
-        print(f'90th quantile for number of events: {np.quantile(nb_events, .9)}')
-        print(f'Mean accuracy: {np.round(meanac,3)*100}%')
-        print(f'Last accuracy: {np.round(lastac,3)*100}%')
-        print(f'Highest probability accuracy: {np.round(best_probability,3)*100}%')
+    if online_acc:   
         fig, ax = plt.subplots()
         sampling = (np.logspace(0,np.log10(np.quantile(nb_events, .9)),100)).astype(int)
         ax.semilogx(sampling[:-1],onlinac[sampling[:-1]]*100, '.', label='online HOTS (ours)');
@@ -510,6 +511,27 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
         plt.setp(ax.get_yticklabels(),fontsize=12)
         ax.legend(fontsize=12, loc='lower right');
         ax.set_ylabel('Accuracy (in %)', fontsize=16);
+        if figure_name:
+            printfig(fig, figure_name)
+    
+    if psycho: 
+        notnan_ind = np.where(np.isnan(matscor)==0)
+        event_nb = np.sort(notnan_ind[1])
+        alpha, beta = fit_PF(notnan_ind[1], matscor[notnan_ind[0], notnan_ind[1]], init_params=[200, .5])
+        
+        fig, ax = plt.subplots()
+        ax.semilogx(notnan_ind[1], matscor[notnan_ind[0], notnan_ind[1]], 'b.', alpha=.01, label='online HOTS (ours)')
+        ax.plot(event_nb, pf(event_nb, alpha, beta))
+        sampling = np.arange(0,len(nb_events))
+        ax.hlines(1/n_classes,0,int(max_len), linestyles='dashed', color='k', label='chance level')
+        ax.set_xlabel('Number of events', fontsize=16);
+        #ax.axis([1,int(max_len),-.01,1.01]);
+        #plt.title('LR classification results evolution as a function of the number of events');
+        plt.setp(ax.get_xticklabels(),fontsize=12)
+        ax.set_yticks([0.0, 1.0])
+        ax.set_yticklabels(["False", "True"], fontsize=16)
+        ax.legend(fontsize=12, loc='lower right');
+        #ax.set_ylabel('Accuracy (in %)', fontsize=16);
         if figure_name:
             printfig(fig, figure_name)
     
@@ -575,6 +597,7 @@ def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None
     
     return meanac, onlinac, lastac, truepos, falsepos
 
+# TODO -> merge these functions
 
 def NR_jitter(jitter,Rmax,Rmin,jitter0,powa): 
     x = jitter**powa
@@ -588,8 +611,15 @@ def fit_NR(jitter,accuracy,init_params=[1,1/10,1e4,2]):
     Rmax = popt[1]
     semisat = popt[2]
     powa = popt[3]
+    return Rmin,Rmax,semisat,powa
 
-    return Rmin,Rmax,semisat, powa
+def pf(x, alpha, beta):
+    return 1. / (1 + np.exp( -(x-alpha)/beta))
+
+def fit_PF(event_nb, success, init_params=[100., 1.]):
+    par, mcov = curve_fit(pf, event_nb, success, p0 = init_params)
+    return par[0], par[1]
+
 
 def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', label='name', nb_class=10, n_epo = 33, fitting = True, logscale = False):
     score_stat = np.zeros([3,len(jit)])
@@ -626,9 +656,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
         x_halfsat = jitter_cont[ind_halfsat[0]]
     return fig, ax, x_halfsat
 
-def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None, verbose = False):
-    
-    mlr_threshold = .99
+def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, fitting = True, figure_name = None, verbose = False):
     
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
