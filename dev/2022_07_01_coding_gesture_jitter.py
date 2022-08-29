@@ -60,12 +60,11 @@ def run_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, dataset_
                     testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
                     testloader = get_loader(testset, kfold = kfold)
                 elif dataset_name=='gesture':
-                    testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform_full)
-                    testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, only_first=True, kfold=kfold)
+                    testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False)#, transform=transform_full)
+                    testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, transform=transform_full, only_first=True, kfold=kfold)
                     
                 hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
                 hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
-
 
 
 print(f'Tonic version installed -> {tonic.__version__}')
