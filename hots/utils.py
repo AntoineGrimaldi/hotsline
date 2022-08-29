@@ -390,7 +390,7 @@ def predict_mlr(mlrlayer,
         
         with torch.no_grad():
             # needed for previous versions, now it should be ok to remove it
-            classif_layer.linear = classif_layer.linear.double()
+            classif_layer.linear = classif_layer.linear#.double()
             #print(classif_layer.linear.weight.dtype)
             likelihood, true_target, timestamps = [], [], []
 
