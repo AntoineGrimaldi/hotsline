@@ -82,8 +82,6 @@ testoutputloader = get_loader(testset_output, kfold = kfold_mlr)
 score = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
 score_nohomeo = make_histogram_classification(trainset_output, testset_output, N_neuronz[-1])
 
-print(score, score_nohomeo)
-
 for tau_cla in tau_cla_list:
 
     model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
