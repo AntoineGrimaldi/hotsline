@@ -132,7 +132,7 @@ betas = (beta1, beta2)
 num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla = 2e8
+tau_cla = 5e5
 drop_proba = .9
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
