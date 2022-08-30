@@ -44,6 +44,8 @@ def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_fi
 
     metadata_path = f'{dataset.location_on_system}/metadata/{dataset_name}_{int(slicing_time_window*1e-3)}_{only_first}_{train}'
     print(metadata_path)
+    
+    #print(only_first, slicing_time_window, transform, kfold, train, dataset_name)
 
     if only_first:
         slicer = tonic.slicers.SliceAtTimePoints(start_tw = [0], end_tw = [slicing_time_window])

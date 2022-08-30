@@ -7,6 +7,7 @@ from tqdm import tqdm
 def run_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, dataset_name, trainset_output, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, fitting = True, figure_name = None, verbose = False):
     
     slicing_time_window = 1e6
+    ts_batch_size = 50000
     
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
@@ -62,6 +63,9 @@ def run_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, dataset_
                 elif dataset_name=='gesture':
                     testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False)#, transform=transform_full)
                     testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, transform=transform_full, only_first=True, kfold=kfold)
+                    
+                #events, target = next(iter(testloader))
+                #print(events.shape)
                     
                 hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
                 hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)

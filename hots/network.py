@@ -119,22 +119,19 @@ class network(object):
                 nb = 0
                 for events, target in tqdm(loader):
                     events = events.squeeze(0)
-                    if ts_batch_size:
+                    if ts_batch_size and len(events)>ts_batch_size:
                         nb_batch = len(events)//ts_batch_size+1
                         for L in range(len(self.tau)):
-                            previous_timesurface = []
+                            previous_timestamp = []
                             outputs = torch.Tensor([])
                             ind_outputs = torch.Tensor([])
                             for load_nb in range(nb_batch):
-                                all_ts, ind_filtered = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timesurface = previous_timesurface, device = device)
-                                if all_ts.shape[0]==0:
-                                    previous_timesurface = []
-                                else:
-                                    previous_timesurface = all_ts[-1,:,:,:]
+                                all_ts, ind_filtered, previous_timestamp = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                                 n_star = self.layers[L](all_ts, False)
-                                outputs = torch.vstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
+
+                                outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
                                 if ind_filtered is not None:
-                                    ind_outputs = torch.vstack([ind_outputs,ind_filtered+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_filtered
+                                    ind_outputs = torch.hstack([ind_outputs,ind_filtered+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_filtered
                                 del all_ts
                                 torch.cuda.empty_cache()
                             if ind_filtered is not None:
@@ -149,6 +146,7 @@ class network(object):
                             events[:,p_index] = n_star.cpu()
                             del all_ts
                             torch.cuda.empty_cache()
+                    print(events)
                     events = events
                     np.save(output_path+f'{classes[target]}/{nb}', events)
                     nb+=1
