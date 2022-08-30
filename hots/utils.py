@@ -723,7 +723,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 test_outputloader = get_loader(testset_output, shuffle=False)
                 
                 likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering)
-                meanac, onlinac, lastac, best_probability = score_classif_events(likelihood, true_target, n_classes, thres = mlr_threshold, verbose=False)
+                meanac, onlinac, lastac, best_probability = score_classif_events(likelihood, true_target, n_classes, thres = mlr_threshold)
 
                 scores_jit_histo[trial,ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
                 scores_jit[trial,ind_jit] = best_probability
