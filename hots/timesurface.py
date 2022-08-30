@@ -1,6 +1,6 @@
 import torch
 
-def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = 1, ts_batch_size = None, load_number = None, previous_timesurface = [], device="cpu", dtype='torch.float32'):
+def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = 1, ts_batch_size = None, load_number = None, previous_timestamp = [], device="cpu", dtype='torch.float32'):
     '''with tonic events is loaded in a standardized format: event -> (x,y,t,p) 
     '''
     x_index = ordering.index('x')
@@ -24,8 +24,8 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     
     if ts_batch_size:
         nb_full_batch = len(events)//ts_batch_size
-        if len(previous_timesurface)>0:
-            timestamp_memory = events[load_number*ts_batch_size-1,t_index] + tau*torch.log(previous_timesurface)
+        if len(previous_timestamp)>0:
+            timestamp_memory = previous_timestamp
         else:
             timestamp_memory -= tau * 3 + 1
         all_surfaces = torch.zeros(
@@ -66,7 +66,13 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     if filtering_threshold:
         indices = torch.nonzero(all_surfaces.sum(dim=(1,2,3))>filtering_threshold).squeeze(1)
         all_surfaces = all_surfaces[indices, :, :, :]
-    return all_surfaces, indices
+        
+    if ts_batch_size:
+        if all_surfaces.shape[0]==0:
+            timestamp_memory = []
+        return all_surfaces, indices, timestamp_memory
+    else:
+        return all_surfaces, indices
 
 
 def snnsurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = None, device="cpu"):
