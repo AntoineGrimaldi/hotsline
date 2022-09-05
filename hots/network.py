@@ -128,7 +128,6 @@ class network(object):
                             for load_nb in range(nb_batch):
                                 all_ts, ind_filtered, previous_timestamp = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                                 n_star = self.layers[L](all_ts, False)
-
                                 outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
                                 if ind_filtered is not None:
                                     ind_outputs = torch.hstack([ind_outputs,ind_filtered+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_filtered
@@ -146,7 +145,6 @@ class network(object):
                             events[:,p_index] = n_star.cpu()
                             del all_ts
                             torch.cuda.empty_cache()
-                    print(events)
                     events = events
                     np.save(output_path+f'{classes[target]}/{nb}', events)
                     nb+=1

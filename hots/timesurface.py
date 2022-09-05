@@ -8,6 +8,8 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     t_index = ordering.index('t')
     p_index = ordering.index('p')
     
+    if filtering_threshold == None: filtering_threshold = 1
+    
     if surface_dimensions:
         assert len(surface_dimensions) == 2
         assert surface_dimensions[0] % 2 == 1 and surface_dimensions[1] % 2 == 1

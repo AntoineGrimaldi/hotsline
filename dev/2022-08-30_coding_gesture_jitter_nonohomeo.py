@@ -10,7 +10,7 @@ def run_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, dataset_
     ts_batch_size = 50000
     
     initial_name = copy.copy(hots.name)
-    #initial_name_nohomeo = copy.copy(hots_nohomeo.name)
+    initial_name_nohomeo = copy.copy(hots_nohomeo.name)
     
     n_classes = len(trainset_output.classes)
     n_output_neurons = len(hots.layers[-1].cumhisto)
@@ -45,7 +45,7 @@ def run_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, dataset_
                         jitter = (jitter_val,None)
                         
                 hots.name = initial_name+f'_{trial}'
-                #hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
+                hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
                 if jitter_type=='temporal':
                     temporal_jitter_transform = tonic.transforms.TimeJitter(std = jitter_val, clip_negative = True, sort_timestamps = True)
@@ -65,9 +65,9 @@ def run_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, dataset_
                     testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, transform=transform_full, only_first=True, kfold=kfold)
                     
                 #events, target = next(iter(testloader))
-                #print(events.shape)
+                print(f'Trial number {trial} - jitter indice {ind_jit}')
                     
-                hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
+                hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, verbose=False)
                 #hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
 
 
@@ -81,7 +81,7 @@ device = "cuda"
     
 kfold_test = None
 kfold_clust = 10
-ts_batch_size = 50000
+ts_batch_size = 20000
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -114,7 +114,7 @@ initial_name = hots.name
 name_nohomeo = 'hots'
 hots_nohomeo = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = False)
 
-#initial_name_nohomeo = hots_nohomeo.name
+initial_name_nohomeo = hots_nohomeo.name
 
 filtering_threshold = [2*Rz[L] for L in range(len(Rz))]
 if not os.path.exists('../Records/'):
@@ -123,9 +123,9 @@ if not os.path.exists('../Records/'):
 path = '../Records/networks/'+hots.name+'.pkl'
 if not os.path.exists(path):
     hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
-#path_nohomeo = '../Records/networks/'+hots_nohomeo.name+'.pkl'
-#if not os.path.exists(path_nohomeo):
-#    hots_nohomeo.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
+path_nohomeo = '../Records/networks/'+hots_nohomeo.name+'.pkl'
+if not os.path.exists(path_nohomeo):
+    hots_nohomeo.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
 
 jitter = (None, None)
 num_workers = 0
@@ -151,8 +151,8 @@ trainset_output_jitter = HOTS_Dataset(train_path, trainset.sensor_size, trainset
 
 standard_spatial_jitter_min = 0
 standard_spatial_jitter_max = 10
-run_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
+run_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, filtering_threshold = filtering_threshold, fitting = False)
 
 standard_temporal_jitter_min = 3
 standard_temporal_jitter_max = 7
-run_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
+run_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, filtering_threshold = filtering_threshold, fitting = False)

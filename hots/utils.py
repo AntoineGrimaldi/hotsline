@@ -358,7 +358,8 @@ def predict_mlr(mlrlayer,
                 results_path,
                 timesurface_size,
                 ordering,
-                ts_batch_size = None
+                save = True,
+                ts_batch_size = None,
         ):    
     
     if os.path.isfile(results_path):
@@ -395,7 +396,7 @@ def predict_mlr(mlrlayer,
                         n_events = X.shape[0]
                         X, label = X, label.to(device)
                         X = X.reshape(n_events, N)
-                        outputs_splitted = classif_layer(X)
+                        outputs_splitted = classif_layer(X.double())
                         outputs = torch.vstack([outputs,outputs_splitted]) if outputs.shape[0]>0 else outputs_splitted
                 else:
                     X, ind_filtered = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
@@ -407,12 +408,13 @@ def predict_mlr(mlrlayer,
                 true_target.append(label.cpu().numpy())
                 del X, outputs
                 torch.cuda.empty_cache()
-            with open(results_path, 'wb') as file:
-                pickle.dump([likelihood, true_target, timestamps], file, pickle.HIGHEST_PROTOCOL)
+            if save:
+                with open(results_path, 'wb') as file:
+                    pickle.dump([likelihood, true_target, timestamps], file, pickle.HIGHEST_PROTOCOL)
 
     return likelihood, true_target, timestamps
 
-def score_classif_events(likelihood, true_target, n_classes, thres=None, original_accuracy = None, original_accuracy_nohomeo = None, online_acc=True, psycho=False, figure_name=False):
+def score_classif_events(likelihood, true_target, n_classes, thres=None, original_accuracy = None, original_accuracy_nohomeo = None, online_acc=False, psycho=False, figure_name=False):
     
     max_len = 0
     for likeli in likelihood:
@@ -641,6 +643,8 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
 
 def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, fitting = True, figure_name = None, verbose = False):
     
+    save_likelihood = False
+    
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
     
@@ -664,13 +668,18 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     scores_jit_histo = np.zeros([nb_trials, len(jitter_values)])
     scores_jit_histo_nohomeo = np.zeros([nb_trials, len(jitter_values)])
 
-    jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}'
+    #jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}'
 
-    if not os.path.exists(jitter_path+'.npz'):
+    #if not os.path.exists(jitter_path+'.npz'):
 
-        torch.set_default_tensor_type("torch.DoubleTensor")
+    torch.set_default_tensor_type("torch.DoubleTensor")
 
-        for trial in tqdm(range(nb_trials)):
+    for trial in tqdm(range(nb_trials)):
+        jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}_{trial}'
+        if not os.path.exists(jitter_path+'.npz'):
+            scores_jit_single = np.zeros([len(jitter_values)])
+            scores_jit_histo_single = np.zeros([len(jitter_values)])
+            scores_jit_histo_nohomeo_single = np.zeros([len(jitter_values)])
             for ind_jit, jitter_val in enumerate(jitter_values):
                 if jitter_val==0:
                     jitter = (None,None)
@@ -679,7 +688,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                         jitter = (None,jitter_val)
                     else:
                         jitter = (jitter_val,None)
-                        
+
                 hots.name = initial_name+f'_{trial}'
 
                 if jitter_type=='temporal':
@@ -688,52 +697,59 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 else:
                     spatial_jitter_transform = tonic.transforms.SpatialJitter(sensor_size = trainset_output.sensor_size, variance_x = jitter_val, variance_y = jitter_val, clip_outliers = True)
                     transform_full = tonic.transforms.Compose([spatial_jitter_transform, type_transform])
-                    
+
                 if dataset_name=='poker':
                     testset = tonic.datasets.POKERDVS(save_to='../../Data/', train=False, transform=transform_full)
                 elif dataset_name=='nmnist':
                     testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
-                
+
                 testloader = get_loader(testset, kfold = kfold)
                 hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
                 num_sample_test = len(testloader)
-                
+
                 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
                 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
                 print(results_path, test_path)
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
-                
-                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering)
+
+                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering, save = save_likelihood)
                 meanac, onlinac, lastac, best_probability = score_classif_events(likelihood, true_target, n_classes, thres = mlr_threshold)
 
-                scores_jit_histo[trial,ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
-                scores_jit[trial,ind_jit] = best_probability
+                scores_jit_histo_single[ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
+                scores_jit_single[ind_jit] = best_probability
 
                 hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
                 hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
                 test_path_nohomeo = f'../Records/output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
                 testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
-                scores_jit_histo_nohomeo[trial,ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
-                
+                scores_jit_histo_nohomeo_single[ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
+
                 if verbose: 
                     print(f'For {jitter_type} jitter equal to {jitter_val}')
-                    print(f'Online HOTS accuracy: {meanac*100} %')
-                    print(f'Original HOTS accuracy: {scores_jit_histo_nohomeo[trial,ind_jit]*100} %')
-                    print(f'HOTS with homeostasis accuracy: {scores_jit_histo[trial,ind_jit]*100} %')
-                
-        if jitter_type=='spatial':
-            jitter_values = np.sqrt(jitter_values)
-        np.savez(jitter_path, jitter_values,scores_jit,scores_jit_histo,scores_jit_histo_nohomeo)
+                    print(f'Online HOTS accuracy: {best_probability*100} %')
+                    print(f'Original HOTS accuracy: {scores_jit_histo_nohomeo_single[ind_jit]*100} %')
+                    print(f'HOTS with homeostasis accuracy: {scores_jit_histo_single[ind_jit]*100} %')
+
+            if jitter_type=='spatial':
+                jitter_values = np.sqrt(jitter_values)
+            np.savez(jitter_path, jitter_values, scores_jit_single, scores_jit_histo_single, scores_jit_histo_nohomeo_single)
+        else:
+            data_stored = np.load(jitter_path+'.npz')
+            jitter_values = data_stored['arr_0']
+            scores_jit_single = data_stored['arr_1']
+            scores_jit_histo_single = data_stored['arr_2']
+            scores_jit_histo_nohomeo_single = data_stored['arr_3']
+
+        scores_jit[trial,:] = scores_jit_single
+        scores_jit_histo[trial,:] = scores_jit_histo_single
+        scores_jit_histo_nohomeo[trial,:] = scores_jit_histo_nohomeo_single
+        
+        print(scores_jit, scores_jit_histo, scores_jit_histo_nohomeo)
+
         hots.name = initial_name
-    else:
-        data_stored = np.load(jitter_path+'.npz')
-        jitter_values = data_stored['arr_0']
-        scores_jit = data_stored['arr_1']
-        scores_jit_histo = data_stored['arr_2']
-        scores_jit_histo_nohomeo = data_stored['arr_3']
         
     if jitter_type=='temporal':
         logscale=True
