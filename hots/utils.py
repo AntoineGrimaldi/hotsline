@@ -707,6 +707,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
                 num_sample_test = len(testloader)
 
+                print(jitter_values, max_jitter, min_jitter)
                 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
                 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
                 print(results_path, test_path)
@@ -734,7 +735,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                     print(f'HOTS with homeostasis accuracy: {scores_jit_histo_single[ind_jit]*100} %')
 
             if jitter_type=='spatial':
-                jitter_values = np.sqrt(jitter_values)
+                jitter_values = std_jit_s
             np.savez(jitter_path, jitter_values, scores_jit_single, scores_jit_histo_single, scores_jit_histo_nohomeo_single)
         else:
             data_stored = np.load(jitter_path+'.npz')
@@ -746,8 +747,6 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
         scores_jit[trial,:] = scores_jit_single
         scores_jit_histo[trial,:] = scores_jit_histo_single
         scores_jit_histo_nohomeo[trial,:] = scores_jit_histo_nohomeo_single
-        
-        print(scores_jit, scores_jit_histo, scores_jit_histo_nohomeo)
 
         hots.name = initial_name
         
