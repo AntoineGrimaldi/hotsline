@@ -690,6 +690,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                         jitter = (jitter_val,None)
 
                 hots.name = initial_name+f'_{trial}'
+                hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
                 if jitter_type=='temporal':
                     temporal_jitter_transform = tonic.transforms.TimeJitter(std = jitter_val, clip_negative = True, sort_timestamps = True)
@@ -700,16 +701,25 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
 
                 if dataset_name=='poker':
                     testset = tonic.datasets.POKERDVS(save_to='../../Data/', train=False, transform=transform_full)
+                    testloader = get_loader(testset, kfold = kfold)
+                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
                 elif dataset_name=='nmnist':
                     testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
-
-                testloader = get_loader(testset, kfold = kfold)
-                hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
+                    testloader = get_loader(testset, kfold = kfold)
+                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
+                if dataset_name=='gesture':
+                    testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False)#, transform=transform_full)
+                    testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, transform=transform_full, only_first=True, kfold=kfold)
+                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, verbose=False)
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, verbose=False)    
+                    
                 num_sample_test = len(testloader)
 
                 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
-                results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
-                print(f'coding done at {test_path}')
+                results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
+                print(results_path)
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
@@ -748,6 +758,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
         scores_jit_histo_nohomeo[trial,:] = scores_jit_histo_nohomeo_single
 
         hots.name = initial_name
+        hots_nohomeo.name = initial_name_nohomeo
         
     if jitter_type=='temporal':
         logscale=True
