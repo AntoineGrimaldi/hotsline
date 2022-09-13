@@ -48,6 +48,8 @@ path = '../Records/networks/'+hots.name+'.pkl'
 if not os.path.exists(path):
     hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
     
+print(path)
+    
 jitter = (None, None)
 num_workers = 0
 learning_rate = 0.0001
@@ -61,7 +63,8 @@ tau_cla_list = [5e5]
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
 
-print(hots.name)
+print(train_path)
+print(test_path)
 
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)

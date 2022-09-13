@@ -707,10 +707,9 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
                 num_sample_test = len(testloader)
 
-                print(jitter_values, max_jitter, min_jitter)
                 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
                 results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{jitter}.pkl'
-                print(results_path, test_path)
+                print(f'coding done at {test_path}')
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
