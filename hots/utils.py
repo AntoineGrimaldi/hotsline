@@ -641,7 +641,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
         x_halfsat = jitter_cont[ind_halfsat[0]]
     return fig, ax, x_halfsat
 
-def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, fitting = True, figure_name = None, verbose = False):
+def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, fitting = True, figure_name = None, verbose = False):
     
     save_likelihood = False
     
