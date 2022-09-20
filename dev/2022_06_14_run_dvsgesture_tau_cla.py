@@ -11,7 +11,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 kfold_test = None
 kfold_clust = 10
-ts_batch_size = 500
+ts_batch_size = 1500
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -69,7 +69,7 @@ print(test_path)
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)
 
-drop_proba = .9
+drop_proba = .75
 if drop_proba:
     drop_transform = tonic.transforms.DropEvent(p = drop_proba)
     full_drop_transform = tonic.transforms.Compose([drop_transform, type_transform])
