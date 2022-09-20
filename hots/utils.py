@@ -654,8 +654,8 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     
     type_transform = tonic.transforms.NumpyAsType(int)
     
-    if not os.path.exists('../Records/jitter_results/'):
-        os.mkdir('../Records/jitter_results/')
+    if not os.path.exists(hots.record_path+'jitter_results/'):
+        os.mkdir(hots.record_path+'jitter_results/')
     if jitter_type=='temporal':
         std_jit_t = np.logspace(min_jitter,max_jitter,nb_points)
         jitter_values = std_jit_t
@@ -668,14 +668,10 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     scores_jit_histo = np.zeros([nb_trials, len(jitter_values)])
     scores_jit_histo_nohomeo = np.zeros([nb_trials, len(jitter_values)])
 
-    #jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}'
-
-    #if not os.path.exists(jitter_path+'.npz'):
-
     torch.set_default_tensor_type("torch.DoubleTensor")
 
     for trial in tqdm(range(nb_trials)):
-        jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}_{trial}'
+        jitter_path = hots.record_path+f'jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}_{trial}'
         if not os.path.exists(jitter_path+'.npz'):
             scores_jit_single = np.zeros([len(jitter_values)])
             scores_jit_histo_single = np.zeros([len(jitter_values)])
@@ -717,8 +713,8 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                     
                 num_sample_test = len(testloader)
 
-                test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
-                results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
+                test_path = hots.record_path+f'output/test/{hots.name}_{num_sample_test}_{jitter}/'
+                results_path = hots.record_path+f'LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
                 print(results_path)
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
@@ -733,7 +729,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
                 hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
-                test_path_nohomeo = f'../Records/output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
+                test_path_nohomeo = hots.record_path+f'output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
                 testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 scores_jit_histo_nohomeo_single[ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
 

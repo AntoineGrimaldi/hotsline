@@ -19,6 +19,7 @@ class network(object):
                         homeo = True, # parameters for homeostasis (None is no homeo rule)
                         snn_analogy = False,
                         to_record = False,
+                        record_path = '../Records/',
                         device = None,
                 ):
         assert len(nb_neurons) == len(R) & len(nb_neurons) == len(tau)
@@ -32,11 +33,12 @@ class network(object):
         self.sensor_size = (sensor_size[0], sensor_size[1])
         self.tau = tau
         self.R = R
+        self.record_path = record_path
         
         if not device:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        path = '../Records/networks/'+self.name+'.pkl'
+        path = self.record_path+'networks/'+self.name+'.pkl'
         if os.path.exists(path):
             with open(path, 'rb') as file:
                 my_network = pickle.load(file)
@@ -48,7 +50,7 @@ class network(object):
                 self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             
     def clustering(self, loader, ordering, filtering_threshold = None, record = False):
-        path = '../Records/networks/'+self.name+'.pkl'
+        path = self.record_path+'networks/'+self.name+'.pkl'
         if not os.path.exists(path):
             p_index = ordering.index('p')
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -91,7 +93,7 @@ class network(object):
             with open(path, 'wb') as file:
                 pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
             if record:
-                path = '../Records/networks/'+self.name+'_recorded_parameters.pkl'
+                path = self.record_path+'networks/'+self.name+'_recorded_parameters.pkl'
                 with open(path, 'wb') as file:
                     pickle.dump([loss, entropy, delta_w, homeostasis], file, pickle.HIGHEST_PROTOCOL)
             
@@ -105,8 +107,8 @@ class network(object):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         if training:
-            output_path = f'../Records/output/train/{self.name}_{len(loader)}_{jitter}/'
-        else: output_path = f'../Records/output/test/{self.name}_{len(loader)}_{jitter}/'
+            output_path = self.record_path+f'output/train/{self.name}_{len(loader)}_{jitter}/'
+        else: output_path = self.record_path+f'output/test/{self.name}_{len(loader)}_{jitter}/'
         
         if os.path.exists(output_path):
             if verbose:
@@ -198,7 +200,7 @@ class network(object):
         return fig
     
     def plotlearning(self, width_fig = 30):
-        path = '../Records/networks/'+self.name+'_recorded_parameters.pkl'
+        path = self.record_path+'networks/'+self.name+'_recorded_parameters.pkl'
         with open(path, 'rb') as file:
             loss, entropy, delta_w, homeostasis = pickle.load(file)
             
