@@ -11,7 +11,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 device = "cuda"
     
-drop_proba_mlr = .5
+#drop_proba_mlr = .5
 kfold = None
 
 type_transform = tonic.transforms.NumpyAsType(int)

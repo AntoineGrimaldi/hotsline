@@ -11,7 +11,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 kfold_test = None
 kfold_clust = 10
-ts_batch_size = 1500
+ts_batch_size = 500
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -55,10 +55,10 @@ num_workers = 0
 learning_rate = 0.0001
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
-num_epochs = 2 ** 5 + 1
+num_epochs = 11#2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
-tau_cla_list = [5e5]
+tau_cla_list = [1e4, 5e4, 1e5, 5e5, 1e6]
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -69,7 +69,7 @@ print(test_path)
 hots.coding(trainloader, trainset.ordering, trainset.classes, training=True, verbose=False)
 hots.coding(testloader, testset.ordering, testset.classes, training=False, verbose=False)
 
-drop_proba = .75
+drop_proba = .99
 if drop_proba:
     drop_transform = tonic.transforms.DropEvent(p = drop_proba)
     full_drop_transform = tonic.transforms.Compose([drop_transform, type_transform])
@@ -89,10 +89,7 @@ for tau_cla in tau_cla_list:
 
     model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
     results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
-    print(f'Number of samples in the trainset set: {len(trainoutputloader)}')
-    
-    print(len(trainoutputloader))
-    
+    print(model_path)
     classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), ts_batch_size = ts_batch_size)
     likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,testoutputloader,results_path,ts_size,testset_output.ordering,  ts_batch_size = ts_batch_size)
     meanac, onlinac, lastac, best_probac = score_classif_events(likelihood, true_target, n_classes, original_accuracy = score, original_accuracy_nohomeo = score_nohomeo)#, figure_name = 'nmnist_online.pdf')

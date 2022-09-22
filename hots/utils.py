@@ -51,6 +51,9 @@ def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_fi
         slicer = tonic.slicers.SliceAtTimePoints(start_tw = [0], end_tw = [slicing_time_window])
     else:
         slicer = tonic.slicers.SliceByTime(time_window = slicing_time_window, include_incomplete = True)
+        
+    transform = None
+
     sliced_dataset = tonic.SlicedDataset(dataset, transform = transform, slicer = slicer, metadata_path = metadata_path)
     
     classes = sliced_dataset.dataset.classes
@@ -224,9 +227,10 @@ class HOTS_Dataset(tonic.dataset.Dataset):
     def __len__(self):
         return self.num_samples
 
-def make_histogram_classification(trainset, testset, nb_output_pola, k = 6):
+def make_histogram_classification(trainset, testset, nb_output_pola, k = 6, device = 'cuda'):
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #print(f'device -> {device}')
     
     p_index = trainset.ordering.index('p')
     train_histo_map = torch.zeros([len(trainset),nb_output_pola], device = device)
@@ -271,7 +275,7 @@ def fit_mlr(loader,
             ordering,
             n_classes,
             ts_batch_size = None,
-            device = None):
+            device = 'cuda'):
     
     if os.path.exists(model_path):
         with open(model_path, 'rb') as file:
@@ -279,8 +283,8 @@ def fit_mlr(loader,
     else:
         criterion = torch.nn.BCELoss(reduction="mean")
         amsgrad = True #or False gives similar results
-        if not device:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            
+        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f'device -> {device}')
         
         N = ts_size[0]*ts_size[1]*ts_size[2]
@@ -293,10 +297,7 @@ def fit_mlr(loader,
 
         mean_loss_epoch = []
         for epoch in tqdm(range(int(num_epochs))):
-            if ts_batch_size:
-                losses = np.zeros([len(loader)*ts_batch_size])
-            else:
-                losses = np.zeros([len(loader)])
+            losses = []
             i = 0
             for events, label in loader:
                 events = events.squeeze(0)
@@ -319,7 +320,7 @@ def fit_mlr(loader,
                         loss = criterion(outputs, labels)
                         loss.backward()
                         optimizer.step()
-                        losses[i] = loss.item()
+                        losses.append(loss.item())
                         i += 1
 
                         del X, outputs, labels, loss
@@ -339,13 +340,15 @@ def fit_mlr(loader,
                     loss = criterion(outputs, labels)
                     loss.backward()
                     optimizer.step()
-                    losses[i] = loss.item()
+                    losses.append(loss.item())
                     i += 1
                     
                     del X, outputs, labels, loss
                     torch.cuda.empty_cache()
-                    
-            mean_loss_epoch.append(losses.mean())
+            #plt.plot(losses,'*')
+            #plt.show()
+            mean_loss_epoch.append(np.nanmean(np.array(losses)))
+            print(f'Loss for epoch number {epoch}: {np.round(np.nanmean(np.array(losses)),3)}')
             
         with open(model_path, 'wb') as file:
             pickle.dump([classif_layer, mean_loss_epoch], file, pickle.HIGHEST_PROTOCOL)
@@ -359,8 +362,9 @@ def predict_mlr(mlrlayer,
                 timesurface_size,
                 ordering,
                 save = True,
+                device = 'cuda',
                 ts_batch_size = None,
-        ):    
+        ):
     
     if os.path.isfile(results_path):
         with open(results_path, 'rb') as file:
@@ -370,9 +374,6 @@ def predict_mlr(mlrlayer,
         t_index = ordering.index('t')
         
         initial_memory = copy.copy(torch.cuda.memory_allocated())
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #print(f'device -> {device}')
 
         classif_layer = mlrlayer.to(device)
         
@@ -403,7 +404,7 @@ def predict_mlr(mlrlayer,
                     n_events = X.shape[0]
                     X, label = X, label.to(device)
                     X = X.reshape(n_events, N)
-                    outputs = classif_layer(X)
+                    outputs = classif_layer(X.double())
                 likelihood.append(outputs.cpu().numpy())
                 true_target.append(label.cpu().numpy())
                 del X, outputs
@@ -582,7 +583,27 @@ def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None
     
     return meanac, onlinac, lastac, truepos, falsepos
 
-# TODO -> merge these functions
+def online_accuracy(mlrlayer,
+                tau_cla,
+                loader,
+                results_path,
+                timesurface_size,
+                ordering,
+                threshold = None,
+                original_accuracy = None,
+                original_accuracy_nohomeo = None,
+                online_plot = False,
+                psycho_plot = False,
+                figure_name = None,
+                save_likelihood = True,
+                device = 'cuda',
+                ts_batch_size = None,):
+    
+    if figure_name:
+        likelihood, true_target, timestamps = predict_mlr(mlrlayer, tau_cla, loader, results_path, timesurface_size, ordering, save=save_likelihood, device=device, ts_batch_size=ts_batch_size)
+        score_classif_events(likelihood, true_target, n_classes, thres=threshold, original_accuracy = original_accuracy, original_accuracy_nohomeo = original_accuracy_nohomeo, online_acc=online_plot, psycho=psycho_plot, figure_name=figure_name)
+    
+    
 
 def NR_jitter(jitter,Rmax,Rmin,jitter0,powa): 
     x = jitter**powa
@@ -641,9 +662,10 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
         x_halfsat = jitter_cont[ind_halfsat[0]]
     return fig, ax, x_halfsat
 
-def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, fitting = True, figure_name = None, verbose = False):
+def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, device = 'cuda', fitting = True, figure_name = None, verbose = False):
     
     save_likelihood = False
+    print(f'device -> {device}')
     
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
@@ -677,6 +699,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
             scores_jit_histo_single = np.zeros([len(jitter_values)])
             scores_jit_histo_nohomeo_single = np.zeros([len(jitter_values)])
             for ind_jit, jitter_val in enumerate(jitter_values):
+                print(f'For {jitter_type} jitter equal to {jitter_val} - Trial number {trial}')
                 if jitter_val==0:
                     jitter = (None,None)
                 else:
@@ -684,7 +707,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                         jitter = (None,jitter_val)
                     else:
                         jitter = (jitter_val,None)
-
+                        
                 hots.name = initial_name+f'_{trial}'
                 hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
 
@@ -698,37 +721,34 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 if dataset_name=='poker':
                     testset = tonic.datasets.POKERDVS(save_to='../../Data/', train=False, transform=transform_full)
                     testloader = get_loader(testset, kfold = kfold)
-                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
-                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
+                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, device = device, verbose=False)
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, device = device, verbose=False)
                 elif dataset_name=='nmnist':
                     testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
                     testloader = get_loader(testset, kfold = kfold)
-                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
-                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
+                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, device = device, verbose=False)
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, device = device, verbose=False)
                 if dataset_name=='gesture':
                     testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False)#, transform=transform_full)
                     testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, transform=transform_full, only_first=True, kfold=kfold)
-                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, verbose=False)
-                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, verbose=False)    
+                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)    
                     
                 num_sample_test = len(testloader)
 
                 test_path = hots.record_path+f'output/test/{hots.name}_{num_sample_test}_{jitter}/'
+                print(test_path)
                 results_path = hots.record_path+f'LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
-                print(results_path)
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
 
-                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering, save = save_likelihood)
+                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering, save = save_likelihood, device = device)
                 meanac, onlinac, lastac, best_probability = score_classif_events(likelihood, true_target, n_classes, thres = mlr_threshold)
 
                 scores_jit_histo_single[ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
                 scores_jit_single[ind_jit] = best_probability
 
-                hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
-
-                hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
                 test_path_nohomeo = hots.record_path+f'output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
                 testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 scores_jit_histo_nohomeo_single[ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)

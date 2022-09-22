@@ -20,7 +20,7 @@ class network(object):
                         snn_analogy = False,
                         to_record = False,
                         record_path = '../Records/',
-                        device = None,
+                        device = 'cuda',
                 ):
         assert len(nb_neurons) == len(R) & len(nb_neurons) == len(tau)
         
@@ -35,25 +35,28 @@ class network(object):
         self.R = R
         self.record_path = record_path
         
-        if not device:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #if not device:
+        #    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         path = self.record_path+'networks/'+self.name+'.pkl'
         if os.path.exists(path):
             with open(path, 'rb') as file:
                 my_network = pickle.load(file)
             self.layers = my_network.layers
+            for L in range(len(self.layers)):
+                self.layers[L] = self.layers[L].to(device)
+            
         else:
             if snn_analogy:
                 self.layers = [snnlayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             else:
                 self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             
-    def clustering(self, loader, ordering, filtering_threshold = None, record = False):
+    def clustering(self, loader, ordering, filtering_threshold = None, device = 'cuda', record = False):
         path = self.record_path+'networks/'+self.name+'.pkl'
         if not os.path.exists(path):
             p_index = ordering.index('p')
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             
             if record:
                 entropy = []
@@ -98,13 +101,13 @@ class network(object):
                     pickle.dump([loss, entropy, delta_w, homeostasis], file, pickle.HIGHEST_PROTOCOL)
             
             
-    def coding(self, loader, ordering, classes, training, ts_batch_size = None, filtering_threshold = None, jitter=(None,None), verbose=True):
+    def coding(self, loader, ordering, classes, training, ts_batch_size = None, filtering_threshold = None, jitter=(None,None), device = 'cuda', verbose=True):
         for L in range(len(self.tau)):
             self.layers[L].homeo_flag = False
         if not filtering_threshold: filtering_threshold = [None for L in range(len(self.tau))]
         
         p_index = ordering.index('p')
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         if training:
             output_path = self.record_path+f'output/train/{self.name}_{len(loader)}_{jitter}/'

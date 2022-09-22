@@ -27,39 +27,38 @@ def run_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, dataset_
 
     jitter_path = f'../Records/jitter_results/{initial_name}_{nb_trials}_{min_jitter}_{max_jitter}_{kfold}_{nb_points}'
 
-    if not os.path.exists(jitter_path+'.npz'):
+    #if not os.path.exists(jitter_path+'.npz'):
 
-        torch.set_default_tensor_type("torch.DoubleTensor")
+    torch.set_default_tensor_type("torch.DoubleTensor")
 
-        for trial in tqdm(range(nb_trials)):
-            for ind_jit, jitter_val in enumerate(jitter_values):
-                if jitter_val==0:
-                    jitter = (None,None)
-                else:
-                    if jitter_type=='temporal':
-                        jitter = (None,jitter_val)
-                    else:
-                        jitter = (jitter_val,None)
-                        
-                hots.name = initial_name+f'_{trial}'
-                hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
-
+    for trial in tqdm(range(nb_trials)):
+        for ind_jit, jitter_val in enumerate(jitter_values):
+            if jitter_val==0:
+                jitter = (None,None)
+            else:
                 if jitter_type=='temporal':
-                    temporal_jitter_transform = tonic.transforms.TimeJitter(std = jitter_val, clip_negative = True, sort_timestamps = True)
-                    transform_full = tonic.transforms.Compose([temporal_jitter_transform, type_transform])
+                    jitter = (None,jitter_val)
                 else:
-                    spatial_jitter_transform = tonic.transforms.SpatialJitter(sensor_size = trainset_output.sensor_size, variance_x = jitter_val, variance_y = jitter_val, clip_outliers = True)
-                    transform_full = tonic.transforms.Compose([spatial_jitter_transform, type_transform])
-                    
-                if dataset_name=='poker':
-                    testset = tonic.datasets.POKERDVS(save_to='../../Data/', train=False, transform=transform_full)
-                elif dataset_name=='nmnist':
-                    testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
-                
-                testloader = get_loader(testset, kfold = kfold)
-                hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, verbose=False)
-                hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, verbose=False)
+                    jitter = (jitter_val,None)
 
+            hots.name = initial_name+f'_{trial}'
+            hots_nohomeo.name = initial_name_nohomeo+f'_{trial}'
+
+            if jitter_type=='temporal':
+                temporal_jitter_transform = tonic.transforms.TimeJitter(std = jitter_val, clip_negative = True, sort_timestamps = True)
+                transform_full = tonic.transforms.Compose([temporal_jitter_transform, type_transform])
+            else:
+                spatial_jitter_transform = tonic.transforms.SpatialJitter(sensor_size = trainset_output.sensor_size, variance_x = jitter_val, variance_y = jitter_val, clip_outliers = True)
+                transform_full = tonic.transforms.Compose([spatial_jitter_transform, type_transform])
+
+            if dataset_name=='poker':
+                testset = tonic.datasets.POKERDVS(save_to='../../Data/', train=False, transform=transform_full)
+            elif dataset_name=='nmnist':
+                testset = tonic.datasets.NMNIST(save_to='../../Data/', train=False, transform=transform_full)
+
+            testloader = get_loader(testset, kfold = kfold)
+            hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, device = device, verbose=True)
+            hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, device = device, verbose=True)
 
 
 print(f'Tonic version installed -> {tonic.__version__}')
@@ -94,12 +93,12 @@ Rz = [2, 4]
 N_neuronz = [16, 32]
 tauz = [1e4*2, 1e4*16]
 
-hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo)
+hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo, device = device)
 
 initial_name = hots.name
 
 name_nohomeo = 'hots'
-hots_nohomeo = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = False)
+hots_nohomeo = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = False, device = device)
 
 initial_name_nohomeo = hots_nohomeo.name
 
@@ -109,10 +108,10 @@ if not os.path.exists('../Records/'):
     os.mkdir('../Records/networks/')
 path = '../Records/networks/'+hots.name+'.pkl'
 if not os.path.exists(path):
-    hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
+    hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold, device = device,)
 path_nohomeo = '../Records/networks/'+hots_nohomeo.name+'.pkl'
 if not os.path.exists(path_nohomeo):
-    hots_nohomeo.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold) 
+    hots_nohomeo.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold, device = device,) 
     
 jitter = (None, None)
 num_workers = 0
@@ -132,11 +131,11 @@ results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{
 train_path_nohomeo = f'../Records/output/train/{hots_nohomeo.name}_{num_sample_train}_{jitter}/'
 test_path_nohomeo = f'../Records/output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
 
-hots.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True, verbose=False)
-hots.coding(testloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=False, verbose=False)
+hots.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True, verbose=False, device = device)
+hots.coding(testloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=False, verbose=False, device = device)
 
-hots_nohomeo.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True, verbose=False)
-hots_nohomeo.coding(testloader, testset.ordering, testset.classes, filtering_threshold = filtering_threshold, training=False, jitter=jitter, verbose=False)
+hots_nohomeo.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, training=True, verbose=False, device = device)
+hots_nohomeo.coding(testloader, testset.ordering, testset.classes, filtering_threshold = filtering_threshold, training=False, jitter=jitter, device = device, verbose=False)
 
 print('coding -> done')
 
