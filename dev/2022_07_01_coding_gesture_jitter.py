@@ -152,7 +152,3 @@ trainset_output_jitter = HOTS_Dataset(train_path, trainset.sensor_size, trainset
 standard_spatial_jitter_min = 0
 standard_spatial_jitter_max = 10
 run_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
-
-standard_temporal_jitter_min = 3
-standard_temporal_jitter_max = 7
-run_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', hots, hots_nohomeo, dataset_name, trainset_output_jitter, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)

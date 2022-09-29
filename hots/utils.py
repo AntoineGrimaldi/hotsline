@@ -399,15 +399,18 @@ def predict_mlr(mlrlayer,
                         X = X.reshape(n_events, N)
                         outputs_splitted = classif_layer(X.double())
                         outputs = torch.vstack([outputs,outputs_splitted]) if outputs.shape[0]>0 else outputs_splitted
+                        del X, outputs_splitted
+                        torch.cuda.empty_cache()
                 else:
                     X, ind_filtered = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
                     n_events = X.shape[0]
                     X, label = X, label.to(device)
                     X = X.reshape(n_events, N)
                     outputs = classif_layer(X.double())
+                    del X
                 likelihood.append(outputs.cpu().numpy())
                 true_target.append(label.cpu().numpy())
-                del X, outputs
+                del outputs
                 torch.cuda.empty_cache()
             if save:
                 with open(results_path, 'wb') as file:
@@ -415,7 +418,7 @@ def predict_mlr(mlrlayer,
 
     return likelihood, true_target, timestamps
 
-def score_classif_events(likelihood, true_target, n_classes, thres=None, original_accuracy = None, original_accuracy_nohomeo = None, online_acc=False, psycho=False, figure_name=False):
+def score_classif_events(likelihood, true_target, n_classes, thres=None):
     
     max_len = 0
     for likeli in likelihood:
@@ -473,55 +476,8 @@ def score_classif_events(likelihood, true_target, n_classes, thres=None, origina
         onlinac = np.nanmean(matscor, axis=0)
         lastac/=nb_test
         best_probability/=nb_test
-        
-    print(f'Number of chance decisions: {nb_no_decision}')
-    print(f'90th quantile for number of events: {np.quantile(nb_events, .9)}')
-    print(f'Mean accuracy: {np.round(meanac,3)*100}%')
-    print(f'Last accuracy: {np.round(lastac,3)*100}%')
-    print(f'Highest probability accuracy: {np.round(best_probability,3)*100}%')
-
-    if online_acc:   
-        fig, ax = plt.subplots()
-        sampling = (np.logspace(0,np.log10(np.quantile(nb_events, .9)),100)).astype(int)
-        ax.semilogx(sampling[:-1],onlinac[sampling[:-1]]*100, '.', label='online HOTS (ours)');
-        ax.hlines(1/n_classes*100,0,int(max_len), linestyles='dashed', color='k', label='chance level')
-        if original_accuracy:
-            ax.hlines(original_accuracy*100,0,int(max_len), linestyles='dashed', color='g', label='HOTS with homeostasis')
-        if original_accuracy_nohomeo:
-            ax.hlines(original_accuracy_nohomeo*100,0,int(max_len), linestyles='dashed', color='r', label='original HOTS')
-        ax.set_xlabel('Number of events', fontsize=16);
-        ax.axis([1,int(max_len),0,101]);
-        #plt.title('LR classification results evolution as a function of the number of events');
-        plt.setp(ax.get_xticklabels(),fontsize=12)
-        #ax.set_yticks([])
-        plt.setp(ax.get_yticklabels(),fontsize=12)
-        ax.legend(fontsize=12, loc='lower right');
-        ax.set_ylabel('Accuracy (in %)', fontsize=16);
-        if figure_name:
-            printfig(fig, figure_name)
     
-    if psycho: 
-        notnan_ind = np.where(np.isnan(matscor)==0)
-        event_nb = np.sort(notnan_ind[1])
-        alpha, beta = fit_PF(notnan_ind[1], matscor[notnan_ind[0], notnan_ind[1]], init_params=[200, .5])
-        
-        fig, ax = plt.subplots()
-        ax.semilogx(notnan_ind[1], matscor[notnan_ind[0], notnan_ind[1]], 'b.', alpha=.01, label='online HOTS (ours)')
-        ax.plot(event_nb, pf(event_nb, alpha, beta))
-        sampling = np.arange(0,len(nb_events))
-        ax.hlines(1/n_classes,0,int(max_len), linestyles='dashed', color='k', label='chance level')
-        ax.set_xlabel('Number of events', fontsize=16);
-        #ax.axis([1,int(max_len),-.01,1.01]);
-        #plt.title('LR classification results evolution as a function of the number of events');
-        plt.setp(ax.get_xticklabels(),fontsize=12)
-        ax.set_yticks([0.0, 1.0])
-        ax.set_yticklabels(["False", "True"], fontsize=16)
-        ax.legend(fontsize=12, loc='lower right');
-        #ax.set_ylabel('Accuracy (in %)', fontsize=16);
-        if figure_name:
-            printfig(fig, figure_name)
-    
-    return meanac, onlinac, lastac, best_probability
+    return meanac, onlinac, lastac, best_probability, np.quantile(nb_events, .9), nb_no_decision
 
 def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None, verbose=True):
     
@@ -589,20 +545,79 @@ def online_accuracy(mlrlayer,
                 results_path,
                 timesurface_size,
                 ordering,
-                threshold = None,
+                n_classes,
+                mlr_threshold = None,
                 original_accuracy = None,
                 original_accuracy_nohomeo = None,
                 online_plot = False,
                 psycho_plot = False,
                 figure_name = None,
-                save_likelihood = True,
+                save_likelihood = False,
                 device = 'cuda',
                 ts_batch_size = None,):
     
-    if figure_name:
+    onlinac_path = results_path[:-4]+f'_onlinac_{mlr_threshold}'
+    if not os.path.exists(onlinac_path+'.npz'):
         likelihood, true_target, timestamps = predict_mlr(mlrlayer, tau_cla, loader, results_path, timesurface_size, ordering, save=save_likelihood, device=device, ts_batch_size=ts_batch_size)
-        score_classif_events(likelihood, true_target, n_classes, thres=threshold, original_accuracy = original_accuracy, original_accuracy_nohomeo = original_accuracy_nohomeo, online_acc=online_plot, psycho=psycho_plot, figure_name=figure_name)
+        meanac, onlinac, lastac, best_probability, percentile_90, nb_no_decision = score_classif_events(likelihood, true_target, n_classes, thres=mlr_threshold)
+        np.savez(onlinac_path, meanac, onlinac, lastac, best_probability, percentile_90, nb_no_decision)
+    else: 
+        data_stored = np.load(onlinac_path+'.npz')
+        meanac = data_stored['arr_0']
+        onlinac = data_stored['arr_1']
+        lastac = data_stored['arr_2']
+        best_probability = data_stored['arr_3']
+        percentile_90 = data_stored['arr_4']
+        nb_no_decision = data_stored['arr_5']
+        
+    print(f'Number of chance decisions: {nb_no_decision}')
+    print(f'90th quantile for number of events: {percentile_90}')
+    print(f'Mean accuracy: {np.round(meanac,3)*100}%')
+    print(f'Last accuracy: {np.round(lastac,3)*100}%')
+    print(f'Highest probability accuracy: {np.round(best_probability,3)*100}%')
+
+    if online_plot:   
+        fig, ax = plt.subplots()
+        sampling = (np.logspace(0,np.log10(percentile_90),100)).astype(int)
+        ax.semilogx(sampling[:-1],onlinac[sampling[:-1]]*100, '.', label='online HOTS (ours)');
+        ax.hlines(1/n_classes*100,0,int(percentile_90), linestyles='dashed', color='k', label='chance level')
+        if original_accuracy:
+            ax.hlines(original_accuracy*100,0,int(percentile_90), linestyles='dashed', color='g', label='HOTS with homeostasis')
+        if original_accuracy_nohomeo:
+            ax.hlines(original_accuracy_nohomeo*100,0,int(percentile_90), linestyles='dashed', color='r', label='original HOTS')
+        ax.set_xlabel('Number of events', fontsize=16);
+        ax.axis([1,int(percentile_90),0,101]);
+        #plt.title('LR classification results evolution as a function of the number of events');
+        plt.setp(ax.get_xticklabels(),fontsize=12)
+        #ax.set_yticks([])
+        plt.setp(ax.get_yticklabels(),fontsize=12)
+        ax.legend(fontsize=12, loc='lower right');
+        ax.set_ylabel('Accuracy (in %)', fontsize=16);
+        if figure_name:
+            printfig(fig, figure_name)
     
+    if psycho_plot: 
+        notnan_ind = np.where(np.isnan(matscor)==0)
+        event_nb = np.sort(notnan_ind[1])
+        alpha, beta = fit_PF(notnan_ind[1], matscor[notnan_ind[0], notnan_ind[1]], init_params=[200, .5])
+        
+        fig, ax = plt.subplots()
+        ax.semilogx(notnan_ind[1], matscor[notnan_ind[0], notnan_ind[1]], 'b.', alpha=.01, label='online HOTS (ours)')
+        ax.plot(event_nb, pf(event_nb, alpha, beta))
+        sampling = np.arange(0,len(nb_events))
+        ax.hlines(1/n_classes,0,int(max_len), linestyles='dashed', color='k', label='chance level')
+        ax.set_xlabel('Number of events', fontsize=16);
+        #ax.axis([1,int(max_len),-.01,1.01]);
+        #plt.title('LR classification results evolution as a function of the number of events');
+        plt.setp(ax.get_xticklabels(),fontsize=12)
+        ax.set_yticks([0.0, 1.0])
+        ax.set_yticklabels(["False", "True"], fontsize=16)
+        ax.legend(fontsize=12, loc='lower right');
+        #ax.set_ylabel('Accuracy (in %)', fontsize=16);
+        if figure_name:
+            printfig(fig, figure_name)
+    
+    return onlinac, best_probability, meanac, lastac
     
 
 def NR_jitter(jitter,Rmax,Rmin,jitter0,powa): 
@@ -665,6 +680,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
 def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, device = 'cuda', fitting = True, figure_name = None, verbose = False):
     
     save_likelihood = False
+    ts_batch_size = None
     print(f'device -> {device}')
     
     initial_name = copy.copy(hots.name)
@@ -742,9 +758,8 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
-
-                likelihood, true_target, timestamps = predict_mlr(classif_layer,tau_cla,test_outputloader,results_path,ts_size, testset_output.ordering, save = save_likelihood, device = device)
-                meanac, onlinac, lastac, best_probability = score_classif_events(likelihood, true_target, n_classes, thres = mlr_threshold)
+                
+                onlinac, best_probability, meanac, lastac = online_accuracy(classif_layer, tau_cla, test_outputloader, results_path, ts_size, testset_output.ordering, n_classes, mlr_threshold = mlr_threshold, ts_batch_size = ts_batch_size)
 
                 scores_jit_histo_single[ind_jit] = make_histogram_classification(trainset_output, testset_output, n_output_neurons)
                 scores_jit_single[ind_jit] = best_probability

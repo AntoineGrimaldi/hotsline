@@ -79,7 +79,7 @@ device = "cuda"
     
 kfold_test = None
 kfold_clust = 10
-ts_batch_size = 2000
+ts_batch_size = 500
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -159,7 +159,3 @@ nb_points = 20
 standard_temporal_jitter_min = 3
 standard_temporal_jitter_max = 7
 run_jitter(standard_temporal_jitter_min, standard_temporal_jitter_max, 'temporal', hots, hots_nohomeo, dataset_name, trainset_output, filtering_threshold = filtering_threshold, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
-
-standard_spatial_jitter_min = 0
-standard_spatial_jitter_max = 10
-run_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, dataset_name, trainset_output, filtering_threshold = filtering_threshold, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, fitting = False)
