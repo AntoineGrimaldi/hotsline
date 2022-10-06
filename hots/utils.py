@@ -275,6 +275,7 @@ def fit_mlr(loader,
             ordering,
             n_classes,
             ts_batch_size = None,
+            drop_proba = None,
             device = 'cuda'):
     
     if os.path.exists(model_path):
@@ -305,7 +306,7 @@ def fit_mlr(loader,
                     nb_batch = len(events)//ts_batch_size+1
                     previous_timestamp = []
                     for load_nb in range(nb_batch):
-                        X, ind_filtered, previous_timestamp = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                        X, ind_filtered, previous_timestamp = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, drop_proba = drop_proba, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                         
                         n_events = X.shape[0]
 
@@ -326,7 +327,7 @@ def fit_mlr(loader,
                         del X, outputs, labels, loss
                         torch.cuda.empty_cache()
                 else:
-                    X, ind_filtered = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, device = device)
+                    X, ind_filtered = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, drop_proba = drop_proba, device = device)
                     X, label = X, label.to(device)
                     n_events = X.shape[0]
                     X = X.reshape(n_events, N)
