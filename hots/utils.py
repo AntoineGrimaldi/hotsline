@@ -1,4 +1,4 @@
-import torch, tonic, os, pickle, copy
+import torch, tonic, os, pickle, copy, shutil
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -680,8 +680,9 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
 def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, device = 'cuda', fitting = True, figure_name = None, verbose = False):
     
     save_likelihood = False
-    ts_batch_size = None
+    ts_batch_size = 1000
     print(f'device -> {device}')
+    slicing_time_window = 1e6
     
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
@@ -745,17 +746,28 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                     hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, device = device, verbose=False)
                     hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, device = device, verbose=False)
                 if dataset_name=='gesture':
-                    testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False)#, transform=transform_full)
-                    testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, transform=transform_full, only_first=True, kfold=kfold)
+                    testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform_full)
+                    testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, only_first=True, kfold=kfold)
                     hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
-                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)    
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
+                    
                     
                 num_sample_test = len(testloader)
 
                 test_path = hots.record_path+f'output/test/{hots.name}_{num_sample_test}_{jitter}/'
                 print(test_path)
                 results_path = hots.record_path+f'LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
-
+                
+                testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
+                test_outputloader = get_loader(testset_output, shuffle=False)
+                
+                if len(test_outputloader)<num_sample_test:
+                    print(f'{len(test_outputloader)} is not enough')
+                    shutil.rmtree(test_path)
+                    #testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform_full)
+                    #testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, only_first=True, kfold=kfold)
+                    hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
+                
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
                 test_outputloader = get_loader(testset_output, shuffle=False)
                 
@@ -766,6 +778,16 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
 
                 test_path_nohomeo = hots.record_path+f'output/test/{hots_nohomeo.name}_{num_sample_test}_{jitter}/'
                 testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
+                
+                if len(testset_output_nohomeo)<num_sample_test:
+                    print(f'{len(testset_output_nohomeo)} is not enough')
+                    shutil.rmtree(test_path_nohomeo)
+                    #testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform_full)
+                    #testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, only_first=True, kfold=kfold)
+                    hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
+                    
+                testset_output_nohomeo = HOTS_Dataset(test_path_nohomeo, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
+                
                 scores_jit_histo_nohomeo_single[ind_jit] = make_histogram_classification(trainset_output_nohomeo, testset_output_nohomeo, n_output_neurons)
 
                 if verbose: 
