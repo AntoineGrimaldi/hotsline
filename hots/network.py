@@ -11,7 +11,7 @@ class network(object):
     def __init__(self,  name,
                         dataset_name,
                         timestr, # date of creation of the network 
-                        sensor_size,
+                        sensor_size, # 
                         nb_neurons = (4,8,16), # architecture of the network (default=Lagorce2017)
                         # parameters of time-surfaces and datasets
                         tau = (1e1,1e2,1e3), #time constant for exponential decay in millisec
