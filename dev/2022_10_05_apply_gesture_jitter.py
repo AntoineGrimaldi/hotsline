@@ -15,7 +15,7 @@ device = "cuda"
     
 kfold_test = None
 kfold_clust = 10
-ts_batch_size = 1000
+ts_batch_size = 2500
 
 dataset_name = 'gesture'
 slicing_time_window = 1e6
@@ -69,11 +69,11 @@ num_workers = 0
 learning_rate = 0.0001
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
-num_epochs = 2 ** 7 + 1
+num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
 tau_cla = 1e8
-drop_proba_mlr = .99
+drop_proba_mlr = .9
 
 train_path = record_path+f'output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = record_path+f'output/test/{hots.name}_{num_sample_test}_{jitter}/'
@@ -99,12 +99,12 @@ trainoutputloader = get_loader(trainset_output)
 testset_output = HOTS_Dataset(test_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=type_transform)
 testoutputloader = get_loader(testset_output)
 
-if drop_proba_mlr:
-    drop_transform = tonic.transforms.DropEvent(p = drop_proba_mlr)
-    trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
-    trainoutputloader = get_loader(trainset_output)
+#if drop_proba_mlr:
+#    drop_transform = tonic.transforms.DropEvent(p = drop_proba_mlr)
+#    trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([drop_transform, type_transform]))
+#    trainoutputloader = get_loader(trainset_output)
 
-classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes))
+classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, ts_size, trainset.ordering, len(trainset.classes), ts_batch_size= ts_batch_size, drop_proba = drop_proba_mlr)
 
 print(f'learning done at path: {model_path}')
 
@@ -116,4 +116,4 @@ trainset_output_jitter = HOTS_Dataset(train_path, trainset.sensor_size, trainset
 
 standard_spatial_jitter_min = 0
 standard_spatial_jitter_max = 10
-apply_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output_jitter, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = drop_proba_mlr, filtering_threshold = None, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, mlr_threshold = None, device = device, fitting = True, figure_name = None, verbose = True)
+#apply_jitter(standard_spatial_jitter_min, standard_spatial_jitter_max, 'spatial', hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output_jitter, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = drop_proba_mlr, filtering_threshold = None, kfold = kfold_jitter, nb_trials = nb_trials, nb_points = nb_points, mlr_threshold = None, device = device, fitting = True, figure_name = None, verbose = True)
