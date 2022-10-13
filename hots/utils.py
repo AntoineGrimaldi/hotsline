@@ -89,6 +89,8 @@ def get_properties(events, target, ind_sample, values, ordering = 'xytp', distin
                 values['synchronous_events'][polarity, ind_sample, target] = (isi==0).mean()
             if 'nb_events' in values.keys():
                 values['nb_events'][polarity, ind_sample, target] = events_pol.shape[0]
+            if 'time' in values.keys():
+                values['time'][polarity, ind_sample, target] = events[-1,t_index]-events[0,t_index]
     else:
         events_pol = events
         isi = np.diff(events_pol[:, t_index])
@@ -100,8 +102,8 @@ def get_properties(events, target, ind_sample, values, ordering = 'xytp', distin
             values['synchronous_events'][0, ind_sample, target] = (isi==0).mean()
         if 'nb_events' in values.keys():
             values['nb_events'][0, ind_sample, target] = events_pol.shape[0]
-    if 'time' in values.keys():
-        values['time'][0, ind_sample, target] = events[-1,t_index]-events[0,t_index]
+        if 'time' in values.keys():
+            values['time'][0, ind_sample, target] = events[-1,t_index]-events[0,t_index]
     return values
 
 def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchronous_events', 'nb_events'], distinguish_labels = False, distinguish_polarities = False):
@@ -150,11 +152,13 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
             x = []
             for p in range(nb_pola):
                 x.append(values[value][p,:,:].sum(axis=1).ravel())
+                print(values[value][p,:,:].sum(axis=1).ravel())
             ttl = value
         elif distinguish_labels:
             x = []
             for c in range(nb_class):
                 x.append(values[value][0,np.nonzero(values[value][0,:,c]),c].ravel())
+                #print(values[value][0,np.nonzero(values[value][0,:,c]),c].ravel())
             ttl = value
         else:
             x = []
@@ -171,7 +175,8 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
         axs[i].set_title(f'Histogram for the {ttl}')
         maxfreq = n.max()
         axs[i].set_ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
-        print(f'Mean value for {ttl}: {np.array(x).mean()}')
+        if not distinguish_polarities and not distinguish_labels:
+            print(f'Mean value for {ttl}: {np.array(x).mean()}')
         #axs[i].set_xscale("log")
         #axs[i].set_yscale("log")
     return values
