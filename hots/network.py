@@ -69,8 +69,7 @@ class network(object):
                     for L in range(len(self.tau)):
                         all_ts, ind_filtered = timesurface(events.squeeze(0), (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device='cpu')
                         n_star = self.layers[L](all_ts, True)
-                        if ind_filtered is not None:
-                            events = events[:,ind_filtered,:]
+                        events = events[:,ind_filtered.tolist(),:]
                         if record:
                             proto_ts = all_ts.clone()
                             kernels = self.layers[L].synapses.weight.data.T
@@ -122,34 +121,34 @@ class network(object):
                 nb = 0
                 for events, target in tqdm(loader):
                     events = events.squeeze(0)
-                    if ts_batch_size and len(events)>ts_batch_size:
-                        nb_batch = len(events)//ts_batch_size+1
+                    if ts_batch_size:
                         for L in range(len(self.tau)):
                             previous_timestamp = []
                             outputs = torch.Tensor([])
                             ind_outputs = torch.Tensor([])
-                            for load_nb in range(nb_batch):
-                                all_ts, ind_filtered, previous_timestamp = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = 'cpu')
+                            start_indice = torch.Tensor([0])
+                            while events.shape[0]-start_indice.item()>ts_batch_size:
+                                if ind_outputs.shape[0]>0:
+                                    start_indice = ind_outputs[-1]+1
+                                all_ts, ind_filtered, previous_timestamp = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, first_indice = start_indice, previous_timestamp = previous_timestamp, device = 'cpu')
                                 n_star = self.layers[L](all_ts.to(device), False)
                                 outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
                                 if ind_filtered is not None:
-                                    ind_outputs = torch.hstack([ind_outputs,ind_filtered+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_filtered
+                                    ind_outputs = torch.hstack([ind_outputs,ind_filtered+start_indice]) if ind_outputs.shape[0]>0 else ind_filtered
                                 del all_ts
                                 torch.cuda.empty_cache()
-                            if ind_filtered is not None:
-                                events = events[ind_outputs,:]
+                            events = events[ind_outputs.tolist(),:]
                             events[:,p_index] = outputs.cpu()
                     else:
                         for L in range(len(self.tau)):
                             all_ts, ind_filtered = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device='cpu')
                             n_star = self.layers[L](all_ts.to(device), False)
-                            if ind_filtered is not None:
-                                events = events[ind_filtered,:]
+                            events = events[ind_filtered.tolist(),:]
                             events[:,p_index] = n_star.cpu()
                             del all_ts
                             torch.cuda.empty_cache()
-                    events = events
-                    np.save(output_path+f'{classes[target]}/{nb}', events)
+                    print(events.cpu().numpy())
+                    np.save(output_path+f'{classes[target]}/{nb}', events.cpu().numpy())
                     nb+=1
                     
                     
