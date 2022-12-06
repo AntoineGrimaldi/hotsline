@@ -1,7 +1,7 @@
 import torch
 
 class hotslayer(torch.nn.Module):
-    def __init__(self, ts_size, n_neurons, homeostasis = True, device="cpu", bias=False):#, dtype=torch.float64):
+    def __init__(self, ts_size, n_neurons, homeostasis = True, threshold=None, device="cpu", bias=False):#, dtype=torch.float64):
         super(hotslayer, self).__init__()
         self.synapses = torch.nn.Linear(ts_size, n_neurons, bias=bias, device=device)#, dtype=dtype)
         torch.nn.init.uniform_(self.synapses.weight, a=0, b=1)
@@ -37,6 +37,7 @@ class hotslayer(torch.nn.Module):
             all_ts = torch.flatten(all_ts, start_dim=1, end_dim=- 1).type(self.synapses.weight.dtype)
             all_ts = all_ts/torch.linalg.norm(all_ts, dim=0)
             beta = self.synapses(all_ts)/(torch.linalg.norm(self.synapses.weight.data, dim=1))
+            #print(torch.sum(beta, dim=1))
             n_star = torch.argmax(beta, dim=1)
         return n_star
     
