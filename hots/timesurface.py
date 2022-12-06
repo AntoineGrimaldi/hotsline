@@ -168,7 +168,6 @@ def timesurface_stack(events, sensor_size, ordering, surface_dimensions=None, ta
                     if ind_to_keep[index]:
                         all_surfaces = torch.cat([all_surfaces,timesurface[None,:]], 0) if all_surfaces.shape[0]>0 else timesurface[None,:]
                         indices = torch.hstack([indices,torch.Tensor([index])]) if indices.shape[0]>0 else torch.Tensor([index])
-                else:
                     
         
     if ts_batch_size:
