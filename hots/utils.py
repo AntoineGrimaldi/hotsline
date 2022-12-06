@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from hots.layer import mlrlayer
-from hots.timesurface import timesurface
+from hots.timesurface import timesurface, timesurface_stack
 from scipy.stats import beta
 from scipy.optimize import curve_fit
 
@@ -290,7 +290,6 @@ def fit_mlr(loader,
         criterion = torch.nn.BCELoss(reduction="mean")
         amsgrad = True #or False gives similar results
             
-        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f'device -> {device}')
         
         N = ts_size[0]*ts_size[1]*ts_size[2]
@@ -303,9 +302,11 @@ def fit_mlr(loader,
 
         mean_loss_epoch = []
         for epoch in tqdm(range(int(num_epochs))):
+            if epoch == 0:
+                drop_proba = None
             losses = []
             i = 0
-            for events, label in loader:
+            for events, label in tqdm(loader):
                 events = events.squeeze(0)
                 if ts_batch_size and len(events)>ts_batch_size:
                     nb_batch = len(events)//ts_batch_size+1
@@ -331,6 +332,7 @@ def fit_mlr(loader,
 
                         del X, outputs, labels, loss
                         torch.cuda.empty_cache()
+                    
                 else:
                     X, ind_filtered = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, drop_proba = drop_proba, device = device)
                     X, label = X, label.to(device)
