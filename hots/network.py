@@ -49,10 +49,14 @@ class network(object):
             else:
                 self.layers = [hotslayer((2*R[L]+1)**2*self.n_pola[L], nb_neurons[L], homeostasis=homeo, device=device) for L in range(nb_layers)]
             
-    def clustering(self, loader, ordering, filtering_threshold = None, device = 'cuda', record = False):
+    def clustering(self, loader, ordering, filtering_threshold = None, device = 'cpu', record = False):
         path = self.record_path+'networks/'+self.name+'.pkl'
         if not os.path.exists(path):
             p_index = ordering.index('p')
+            
+            for L in range(len(self.tau)):
+                self.layers[L] = self.layers[L].to(device)
+                self.layers[L].cumhisto = self.layers[L].cumhisto.to(device)
             
             if record:
                 entropy = []
@@ -102,6 +106,8 @@ class network(object):
         #homeostatic gain control is used only for the clustering phase
         for L in range(len(self.tau)):
             self.layers[L].homeo_flag = False
+            self.layers[L] = self.layers[L].to(device)
+            self.layers[L].cumhisto = self.layers[L].cumhisto.to(device)
         
         if not filtering_threshold: filtering_threshold = [None for L in range(len(self.tau))]
         if not layer_threshold: layer_threshold = [None for L in range(len(self.tau))]
