@@ -305,13 +305,17 @@ def fit_mlr(loader,
         for epoch in tqdm(range(int(num_epochs))):
             losses = []
             i = 0
-            for events, label in loader:
+            for events, label in tqdm(loader):
                 events = events.squeeze(0)
                 if ts_batch_size and len(events)>ts_batch_size:
                     nb_batch = len(events)//ts_batch_size+1
                     previous_timestamp = []
-                    for load_nb in range(nb_batch):
+                    load_nb = 0
+                    while load_nb<nb_batch and X.shape[0]<ts_batch_size:
+                    #for load_nb in range(nb_batch):
                         X, ind_filtered, previous_timestamp = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, drop_proba = drop_proba, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                        
+                        
                         
                         n_events = X.shape[0]
 
