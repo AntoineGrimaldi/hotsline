@@ -311,10 +311,11 @@ def fit_mlr(loader,
                     nb_batch = len(events)//ts_batch_size+1
                     previous_timestamp = []
                     load_nb = 0
+                    X = torch.Tensor([])
                     while load_nb<nb_batch and X.shape[0]<ts_batch_size:
                     #for load_nb in range(nb_batch):
-                        X, ind_filtered, previous_timestamp = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, drop_proba = drop_proba, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
-                        
+                        ts, ind_filtered, previous_timestamp = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, drop_proba = drop_proba, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                        X = 
                         
                         
                         n_events = X.shape[0]
