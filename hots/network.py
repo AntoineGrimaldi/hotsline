@@ -1,4 +1,4 @@
-from hots.layer import hotslayer, snnlayer
+from hots.layer import hotslayer
 from tqdm import tqdm
 from hots.timesurface import timesurface
 import numpy as np
@@ -35,9 +35,6 @@ class network(object):
         self.R = R
         self.record_path = record_path
         
-        #if not device:
-        #    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
         path = self.record_path+'networks/'+self.name+'.pkl'
         if os.path.exists(path):
             with open(path, 'rb') as file:
@@ -56,7 +53,6 @@ class network(object):
         path = self.record_path+'networks/'+self.name+'.pkl'
         if not os.path.exists(path):
             p_index = ordering.index('p')
-            #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             
             if record:
                 entropy = []
@@ -101,13 +97,16 @@ class network(object):
                     pickle.dump([loss, entropy, delta_w, homeostasis], file, pickle.HIGHEST_PROTOCOL)
             
             
-    def coding(self, loader, ordering, classes, training, ts_batch_size = None, filtering_threshold = None, jitter=(None,None), device = 'cuda', verbose=True):
+    def coding(self, loader, ordering, classes, training, ts_batch_size = None, filtering_threshold = None, jitter=(None,None), layer_threshold = None, device = 'cuda', verbose=True):
+        
+        #homeostatic gain control is used only for the clustering phase
         for L in range(len(self.tau)):
             self.layers[L].homeo_flag = False
+        
         if not filtering_threshold: filtering_threshold = [None for L in range(len(self.tau))]
+        if not layer_threshold: layer_threshold = [None for L in range(len(self.tau))]
         
         p_index = ordering.index('p')
-        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         if training:
             output_path = self.record_path+f'output/train/{self.name}_{len(loader)}_{jitter}/'
@@ -141,6 +140,9 @@ class network(object):
                             if ind_filtered is not None:
                                 events = events[ind_outputs,:]
                             events[:,p_index] = outputs.cpu()
+                            if layer_threshold[L] is not None:
+                                ind_to_keep = torch.where(n_star>layer_threshold[L])[0]
+                                events = events[ind_to_keep,:]
                     else:
                         for L in range(len(self.tau)):
                             all_ts, ind_filtered = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
@@ -148,9 +150,11 @@ class network(object):
                             if ind_filtered is not None:
                                 events = events[ind_filtered,:]
                             events[:,p_index] = n_star.cpu()
+                            if layer_threshold[L] is not None:
+                                ind_to_keep = torch.where(n_star>layer_threshold[L])[0]
+                                events = events[ind_to_keep,:]
                             del all_ts
                             torch.cuda.empty_cache()
-                    events = events
                     np.save(output_path+f'{classes[target]}/{nb}', events)
                     nb+=1
                     
