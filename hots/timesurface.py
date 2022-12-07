@@ -65,9 +65,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
             timesurface[timesurface<torch.exp(torch.tensor(-5))] = 0
         all_surfaces[index, :, :, :] = timesurface
     
-    indices = None
-    if filtering_threshold:
-        indices = torch.nonzero(all_surfaces.sum(dim=(1,2,3))>filtering_threshold).squeeze(1)
+    indices = torch.nonzero(all_surfaces.sum(dim=(1,2,3))>filtering_threshold).squeeze(1)
         
     if drop_proba:        
         n_kept_events = int((1-drop_proba) * len(indices) + 0.5)

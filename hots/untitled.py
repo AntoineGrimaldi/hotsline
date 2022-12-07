@@ -1,9 +1,9 @@
 import tonic, torch, os, pickle
 from tqdm import tqdm
-from hots.network import network
-from hots.layer import mlrlayer
-from hots.timesurface import timesurface
-from hots.utils import apply_jitter, get_loader, get_sliced_loader, make_histogram_classification, HOTS_Dataset, fit_mlr, predict_mlr, score_classif_events, plotjitter, printfig, online_accuracy
+from network import network
+from layer import mlrlayer
+from timesurface import timesurface
+from utils import apply_jitter, get_loader, get_sliced_loader, make_histogram_classification, HOTS_Dataset, fit_mlr, predict_mlr, score_classif_events, plotjitter, printfig, online_accuracy
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -54,7 +54,7 @@ if not os.path.exists(record_path):
     os.mkdir(record_path+'networks/')
 path = record_path+'networks/'+hots.name+'.pkl'
 if not os.path.exists(path):
-    hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold)
+    hots.clustering(loader, trainset.ordering, filtering_threshold = filtering_threshold, device = 'cuda')
     
     
 jitter = (None, None)
@@ -72,12 +72,13 @@ ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
 tau_cla = 3e4*32
 drop_proba = .95
 
-ts_batch_size = 2000
+ts_batch_size = 1500
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
-model_path = f'{hots.record_path}networks/{hots.name}_{tau_cla}_{num_sample_train}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
-results_path = f'{hots.record_path}LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
+model_path = f'../Records/networks/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
+results_path = f'../Records/LR_results/{hots.name}_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
+print(model_path)
 
 drop_transform = tonic.transforms.DropEvent(p = drop_proba)
 kfold_mlr = None

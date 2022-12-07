@@ -13,7 +13,7 @@ class hotslayer(torch.nn.Module):
         gain = torch.exp(lambda_homeo*(1-self.cumhisto.size(dim=0)*self.cumhisto/self.cumhisto.sum()))
         return gain
 
-    def forward(self, all_ts, clustering_flag):
+    def forward(self, all_ts, clustering_flag, layer_threshold=None):
         if clustering_flag:
             n_star = torch.zeros(all_ts.shape[0])
             for iev in range(len(all_ts)):
@@ -38,7 +38,12 @@ class hotslayer(torch.nn.Module):
             all_ts = all_ts/torch.linalg.norm(all_ts, dim=0)
             beta = self.synapses(all_ts)/(torch.linalg.norm(self.synapses.weight.data, dim=1))
             n_star = torch.argmax(beta, dim=1)
-        return n_star
+            
+        if layer_threshold:
+            indices = torch.where(n_star>layer_threshold)[0]
+        else:
+            indices = torch.arange(all_ts.shape[0])
+        return n_star, indices
     
     
 class mlrlayer(torch.nn.Module):

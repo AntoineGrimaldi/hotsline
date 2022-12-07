@@ -306,7 +306,7 @@ def fit_mlr(loader,
                 drop_proba = None
             losses = []
             i = 0
-            for events, label in tqdm(loader):
+            for events, label in loader:
                 events = events.squeeze(0)
                 if ts_batch_size and len(events)>ts_batch_size:
                     nb_batch = len(events)//ts_batch_size+1
