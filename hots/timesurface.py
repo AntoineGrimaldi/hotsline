@@ -79,9 +79,9 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     if ts_batch_size:
         if all_surfaces.shape[0]==0:
             timestamp_memory = []
-        return all_surfaces, indices, timestamp_memory
+        return all_surfaces, indices.cpu(), timestamp_memory
     else:
-        return all_surfaces, indices
+        return all_surfaces, indices.cpu()
 
 
 def timesurface_stack(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = 1, drop_proba = None, ts_batch_size = None, first_indice = 0, previous_timestamp = [], device="cpu", dtype='torch.float32'):

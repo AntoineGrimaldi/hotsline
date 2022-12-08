@@ -72,10 +72,10 @@ class network(object):
                     if record:
                         previous_dic = [self.layers[L].synapses.weight.data.T.detach().clone() for L in range(len(self.tau))]
                     for L in range(len(self.tau)):
-                        all_ts, ind_filtered = timesurface(events.squeeze(0), (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
-                        n_star = self.layers[L](all_ts, True)
-                        if ind_filtered is not None:
-                            events = events[:,ind_filtered,:]
+                        all_ts, ind_filtered_timesurface = timesurface(events.squeeze(0), (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
+                        n_star, ind_filtered_layer  = self.layers[L](all_ts, True)
+                        if ind_filtered_timesurface is not None:
+                            events = events[:,ind_filtered_timesurface,:]
                         if record:
                             proto_ts = all_ts.detach().clone()
                             kernels = self.layers[L].synapses.weight.data.T

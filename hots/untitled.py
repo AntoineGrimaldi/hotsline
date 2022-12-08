@@ -41,7 +41,7 @@ dataset_name = 'gesture'
 
 Rz = [4, 8]
 N_neuronz = [16, 32]
-layer_threshold = [0.03, 0.06]
+layer_threshold = [0.05, 0.1]
 tauz = [3e3*2, 3e3*16]
 
 hots = network(name, dataset_name, timestr, trainset.sensor_size, nb_neurons = N_neuronz, tau = tauz, R = Rz, homeo = homeo, record_path=record_path)

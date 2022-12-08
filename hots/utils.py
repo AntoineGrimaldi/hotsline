@@ -376,7 +376,7 @@ def predict_mlr(mlrlayer,
     
     if os.path.isfile(results_path):
         with open(results_path, 'rb') as file:
-            likelihood, true_target, timestamps = pickle.load(file) 
+            likelihood, true_target, timestamps = pickle.load(file)
     else:    
         N = timesurface_size[0]*timesurface_size[1]*timesurface_size[2]
         t_index = ordering.index('t')
