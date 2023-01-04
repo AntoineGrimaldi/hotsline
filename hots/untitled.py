@@ -63,16 +63,16 @@ hots.coding(trainloader, trainset.ordering, trainset.classes, filtering_threshol
 hots.coding(testloader, trainset.ordering, trainset.classes, filtering_threshold = filtering_threshold, layer_threshold = layer_threshold, training=False, verbose=False)
 
 num_workers = 0
-learning_rate = 0.0001
+learning_rate = 0.00005
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
-num_epochs = 5#2 ** 6 + 1
+num_epochs = 2 ** 5 + 1
 N_output_neurons = N_neuronz[-1]
 ts_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
 tau_cla = 3e4*32
 drop_proba = .95
 
-ts_batch_size = 1500
+ts_batch_size = 1000
 
 train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
 test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'

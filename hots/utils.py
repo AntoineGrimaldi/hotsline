@@ -14,6 +14,17 @@ def printfig(fig, name):
     #path = '../../GrimaldiEtAl2020HOTS_clone_laurent/fig'
     fig.savefig(path+name, dpi = dpi_exp, bbox_inches=bbox, transparent=True)
     
+def entropy(timesurface):
+    hist = torch.histc(timesurface, bins = 256, min = 0, max = 1)
+    return -torch.nansum(hist*torch.log2(hist))
+    
+def timesurfaces_entropy(all_ts):
+    ent_by_ev = torch.zeros([all_ts.shape[0]])
+    for event_indice in range(all_ts.shape[0]):
+        ent = entropy(all_ts[event_indice,:,:,:])
+        ent_by_ev[event_indice] = ent
+    return ent_by_ev
+    
 def get_loader(dataset, kfold = None, kfold_ind = 0, num_workers = 0, shuffle=True, batch_size = 1, seed=42):
     # creates a loader for the samples of the dataset. If kfold is not None, 
     # then the dataset is splitted into different folds with equal repartition of the classes.
@@ -299,13 +310,11 @@ def fit_mlr(loader,
         optimizer = torch.optim.Adam(
             classif_layer.parameters(), lr=learning_rate, betas=betas, amsgrad=amsgrad
         )
-
         mean_loss_epoch = []
         for epoch in tqdm(range(int(num_epochs))):
-            if epoch == 0:
+            if epoch > 1:
                 drop_proba = None
             losses = []
-            i = 0
             for events, label in loader:
                 events = events.squeeze(0)
                 if ts_batch_size and len(events)>ts_batch_size:
@@ -328,7 +337,6 @@ def fit_mlr(loader,
                         loss.backward()
                         optimizer.step()
                         losses.append(loss.item())
-                        i += 1
 
                         del X, outputs, labels, loss
                         torch.cuda.empty_cache()
@@ -349,17 +357,18 @@ def fit_mlr(loader,
                     loss.backward()
                     optimizer.step()
                     losses.append(loss.item())
-                    i += 1
                     
                     del X, outputs, labels, loss
                     torch.cuda.empty_cache()
-            #plt.plot(losses,'*')
-            #plt.show()
+                #print(f'New label {label.item()} - Mean loss: {np.round(np.nanmean(np.array(losses)),3)}')
+                #plt.plot(losses,'*')
+                #plt.show()
             mean_loss_epoch.append(np.nanmean(np.array(losses)))
             print(f'Loss for epoch number {epoch}: {np.round(np.nanmean(np.array(losses)),3)}')
             
-        with open(model_path, 'wb') as file:
-            pickle.dump([classif_layer, mean_loss_epoch], file, pickle.HIGHEST_PROTOCOL)
+            with open(model_path, 'wb') as file:
+                pickle.dump([classif_layer, mean_loss_epoch], file, pickle.HIGHEST_PROTOCOL)
+                
 
     return classif_layer, mean_loss_epoch
 
@@ -686,12 +695,10 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
         #x_halfsat = jitter_cont[ind_halfsat[0]]
     return fig, ax, x_halfsat
 
-def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, device = 'cuda', fitting = True, figure_name = None, verbose = False):
+def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, ts_batch_size = None, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, slicing_time_window = 1e6, device = 'cuda', fitting = True, figure_name = None, verbose = False):
     
     save_likelihood = False
-    ts_batch_size = 1000
     print(f'device -> {device}')
-    slicing_time_window = 1e6
     
     initial_name = copy.copy(hots.name)
     initial_name_nohomeo = copy.copy(hots_nohomeo.name)
