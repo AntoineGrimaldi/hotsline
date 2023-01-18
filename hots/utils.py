@@ -1,6 +1,8 @@
 import torch, tonic, os, pickle, copy, shutil
 import numpy as np
 import matplotlib.pyplot as plt
+import imageio.v3 as iio
+from IPython.display import Image
 from tqdm import tqdm
 from hots.layer import mlrlayer
 from hots.timesurface import timesurface, timesurface_stack
@@ -872,4 +874,50 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     
     return jitter_values, scores_jit, scores_jit_histo, scores_jit_histo_nohomeo
 
+def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_frames = 100, ts_batch_size = None, device = 'cuda'):
+    
+    if os.path.exists(f'figures/{file_name}_{polarity}.gif'):
+        return Image(filename=f'figures/{file_name}_{polarity}.gif')
+
+    else:
+        print('Building .gif ...')
+        frame_interval = int(events.shape[0]/nb_frames)
+        indices_of_frames = np.arange(0,events.shape[0],frame_interval)
+        if ts_batch_size and len(events)>ts_batch_size:
+            nb_batch = len(events)//ts_batch_size+1
+            previous_timestamp = []
+            outputs = torch.Tensor([])
+            ind_outputs = torch.Tensor([])
+            for load_nb in tqdm(range(nb_batch)):
+                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                indices_batch = indices_of_frames[np.where((indices_of_frames>=load_nb*ts_batch_size)&(indices_of_frames<(load_nb+1)*ts_batch_size))[0]]
+                for event_indice in indices_batch-load_nb*ts_batch_size:
+                    plt.imshow(all_ts[event_indice][0,:,:].cpu());
+                    plt.axis('off');
+                    plt.savefig(f'figures/ts_off_{file_name}_{event_indice+load_nb*ts_batch_size}');
+                    plt.imshow(all_ts[event_indice][1,:,:].cpu());
+                    plt.axis('off');
+                    plt.savefig(f'figures/ts_on_{file_name}_{event_indice+load_nb*ts_batch_size}');
+                del all_ts
+                torch.cuda.empty_cache()
+        else:
+            all_ts, ind_filtered = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, device = device)
+            for event_indice in indices_of_frames:
+                plt.imshow(all_ts[event_indice][0,:,:].cpu());
+                plt.axis('off');
+                plt.savefig(f'figures/ts_off_{file_name}_{event_indice}');
+                plt.imshow(all_ts[event_indice][1,:,:].cpu());
+                plt.axis('off');
+                plt.savefig(f'figures/ts_on_{file_name}_{event_indice}');
+
+        frames_off = np.stack([iio.imread(f"figures/ts_off_{file_name}_{x}.png") for x in indices_of_frames], axis=0)
+        frames_on = np.stack([iio.imread(f"figures/ts_on_{file_name}_{x}.png") for x in indices_of_frames], axis=0)
+        iio.imwrite(f'figures/{file_name}_off.gif', frames_off)
+        iio.imwrite(f'figures/{file_name}_on.gif', frames_on)
+
+        for x in indices_of_frames:
+            os.remove(f"figures/ts_off_{file_name}_{x}.png")
+            os.remove(f"figures/ts_on_{file_name}_{x}.png")
+            
+        return Image(filename=f'figures/{file_name}_{polarity}.gif')
 
