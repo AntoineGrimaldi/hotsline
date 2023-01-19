@@ -8,8 +8,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     t_index = ordering.index('t')
     p_index = ordering.index('p')
     
-    if torch.unique(events[:,p_index][0])==-1:
-        events[events[:,p_index]==-1,p_index] = 0
+    if torch.unique(events[:,p_index][0])==-1: events[events[:,p_index]==-1,p_index] = 0
     
     if filtering_threshold == None: filtering_threshold = 1
     
@@ -32,7 +31,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
         if len(previous_timestamp)>0:
             timestamp_memory = previous_timestamp
         else:
-            timestamp_memory -= tau * 3 + 1
+            timestamp_memory -= tau * 5 + 1
         all_surfaces = torch.zeros(
             (ts_batch_size, sensor_size[2], surface_dimensions[1],surface_dimensions[0])).to(device)
         if load_number>=nb_full_batch:
@@ -40,7 +39,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
         else:
             events_list = events[load_number*ts_batch_size:(load_number+1)*ts_batch_size,:]
     else:
-        timestamp_memory -= tau * 3 + 1
+        timestamp_memory -= tau * 5 + 1
         all_surfaces = torch.zeros(
             (len(events), sensor_size[2], surface_dimensions[1],surface_dimensions[0])).to(device)
         events_list = events
@@ -61,14 +60,14 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
             timestamp_context = timestamp_memory - event[t_index]
 
         if decay == "lin":
-            timesurface = timestamp_context / (3 * tau) + 1
+            timesurface = timestamp_context / (5 * tau) + 1
             timesurface[timesurface < 0] = 0
         elif decay == "exp":
             timesurface = torch.exp(timestamp_context / tau)
             timesurface[timesurface<torch.exp(torch.tensor(-5))] = 0
         all_surfaces[index, :, :, :] = timesurface
-    
-    indices = torch.nonzero(all_surfaces.sum(dim=(1,2,3))>filtering_threshold).squeeze(1)
+        
+    indices = torch.where((all_surfaces>0).sum(dim=(1,2,3))>filtering_threshold)[0]
         
     if drop_proba:
         n_kept_events = int((1-drop_proba) * len(indices) + 0.5)
