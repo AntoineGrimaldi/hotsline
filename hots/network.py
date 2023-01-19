@@ -170,7 +170,7 @@ class network(object):
                                 all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                                 n_star, ind_filtered_layer = self.layers[L](all_ts, False)
                                 ind_to_keep = ind_filtered_timesurface[ind_filtered_layer]
-                                outputs = torch.hstack([outputs,n_star[ind_to_keep]]) if outputs.shape[0]>0 else n_star[ind_to_keep]
+                                outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
                                 ind_outputs = torch.hstack([ind_outputs,ind_to_keep+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_to_keep
                                 del all_ts
                                 torch.cuda.empty_cache()

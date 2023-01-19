@@ -40,7 +40,8 @@ class hotslayer(torch.nn.Module):
             n_star = torch.argmax(beta, dim=1)
             
         if layer_threshold:
-            indices = torch.where(n_star>layer_threshold)[0]
+            indices = torch.where(beta[n_star]>layer_threshold)[0]
+            n_star = n_star[indices]
         else:
             indices = torch.arange(all_ts.shape[0])
         return n_star, indices
@@ -48,7 +49,7 @@ class hotslayer(torch.nn.Module):
     
 class mlrlayer(torch.nn.Module):
     
-    def __init__(self, ts_size, n_classes, device='cpu', bias=True):
+    def __init__(self, ts_size, n_classes, device="cpu", bias=True):
         super(mlrlayer, self).__init__()
         self.linear = torch.nn.Linear(ts_size, n_classes, bias=bias, device=device)
         self.nl = torch.nn.Softmax(dim=1)
