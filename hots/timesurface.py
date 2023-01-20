@@ -8,7 +8,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
     t_index = ordering.index('t')
     p_index = ordering.index('p')
     
-    if torch.unique(events[:,p_index][0])==-1: events[events[:,p_index]==-1,p_index] = 0
+    if torch.unique(events[:,p_index])[0]==-1: events[events[:,p_index]==-1,p_index] = 0
     
     if filtering_threshold == None: filtering_threshold = 1
     
