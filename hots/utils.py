@@ -1,4 +1,4 @@
-import torch, tonic, os, pickle, copy, shutil
+import torch, tonic, os, pickle, copy, shutil, glob
 import numpy as np
 import matplotlib.pyplot as plt
 import imageio.v3 as iio
@@ -313,7 +313,16 @@ def fit_mlr(loader,
             classif_layer.parameters(), lr=learning_rate, betas=betas, amsgrad=amsgrad
         )
         mean_loss_epoch = []
-        for epoch in tqdm(range(int(num_epochs))):
+        
+        past_trainings = glob.glob(f'{model_path[:-4]}*')
+        if len(past_trainings)==1:
+            with open(past_trainings[0], 'rb') as file:
+                classif_layer, mean_loss_epoch = pickle.load(file)
+            epoch_vector = np.arange(len(mean_loss_epoch), int(num_epochs))
+        else:
+            epoch_vector = range(int(num_epochs))
+        
+        for epoch in tqdm(epoch_vector):
             if epoch > 1:
                 drop_proba = None
             losses = []
@@ -368,9 +377,14 @@ def fit_mlr(loader,
             mean_loss_epoch.append(np.nanmean(np.array(losses)))
             print(f'Loss for epoch number {epoch}: {np.round(np.nanmean(np.array(losses)),3)}')
             
-            with open(model_path, 'wb') as file:
+            with open(model_path[:-4]+f'_it{epoch}.pkl', 'wb') as file:
                 pickle.dump([classif_layer, mean_loss_epoch], file, pickle.HIGHEST_PROTOCOL)
-                
+            
+            if os.path.exists(model_path[:-4]+f'_it{epoch-1}.pkl'): os.remove(model_path[:-4]+f'_it{epoch-1}.pkl')
+        
+        with open(model_path, 'wb') as file:
+            pickle.dump([classif_layer, mean_loss_epoch], file, pickle.HIGHEST_PROTOCOL)
+        os.remove(model_path[:-4]+f'_it{epoch}.pkl')
 
     return classif_layer, mean_loss_epoch
 
