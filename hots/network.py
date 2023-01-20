@@ -101,6 +101,7 @@ class network(object):
                                 torch.cuda.empty_cache()
                             events = events[ind_outputs,:]
                             events[:,p_index] = outputs.cpu()
+                            if events.shape[0]==0: break
                     else:    
                         for L in range(len(self.tau)):
                             all_ts, ind_filtered_timesurface = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
@@ -123,6 +124,7 @@ class network(object):
                             
                             events = events[ind_filtered_timesurface,:]
                             events[:,p_index] = n_star.cpu()
+                            if events.shape[0]==0: break
 
             with open(path, 'wb') as file:
                 pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
@@ -176,6 +178,7 @@ class network(object):
                                 torch.cuda.empty_cache()
                             events = events[ind_outputs,:]
                             events[:,p_index] = outputs.cpu()
+                            if events.shape[0]==0: break
                     else:
                         for L in range(len(self.tau)):
                             all_ts, ind_filtered_timesurface = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
@@ -185,6 +188,7 @@ class network(object):
                             events = events[ind_filtered_layer,:]
                             del all_ts
                             torch.cuda.empty_cache()
+                            if events.shape[0]==0: break
                     np.save(output_path+f'{classes[target]}/{nb}', events)
                     nb+=1
                     

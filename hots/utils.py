@@ -880,6 +880,7 @@ def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_fr
         return Image(filename=f'figures/{file_name}_{polarity}.gif')
 
     else:
+        if not os.path.exists('figures/'): os.mkdir('figures')
         print('Building .gif ...')
         frame_interval = int(events.shape[0]/nb_frames)
         indices_of_frames = np.arange(0,events.shape[0],frame_interval)

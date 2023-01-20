@@ -11,5 +11,6 @@ hots.egg-info/*
 .ipynb_checkpoints/*
 build/
 dist/
+hots/figures/
 *.pyc
 .ipynb_checkpoints/setup-checkpoint.py
