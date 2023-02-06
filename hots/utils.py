@@ -588,7 +588,6 @@ def online_accuracy(mlrlayer,
                 save_likelihood = False,
                 device = 'cuda',
                 ts_batch_size = None,):
-    
     onlinac_path = results_path[:-4]+f'_onlinac_{mlr_threshold}'
     if not os.path.exists(onlinac_path+'.npz'):
         likelihood, true_target, timestamps = predict_mlr(mlrlayer, tau_cla, loader, results_path, timesurface_size, ordering, save=save_likelihood, device=device, ts_batch_size=ts_batch_size)
