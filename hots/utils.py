@@ -314,7 +314,7 @@ def fit_mlr(loader,
         )
         mean_loss_epoch = []
         
-        past_trainings = glob.glob(f'{model_path[:-4]}*')
+        past_trainings = glob.glob(glob.escape(model_path[:-10])+'*')
         if len(past_trainings)==1:
             with open(past_trainings[0], 'rb') as file:
                 classif_layer, mean_loss_epoch = pickle.load(file)
