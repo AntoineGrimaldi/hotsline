@@ -934,4 +934,7 @@ def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_fr
             os.remove(f"figures/ts_on_{file_name}_{x}.png")
             
         return Image(filename=f'figures/{file_name}_{polarity}.gif')
+    
+    
+
 
