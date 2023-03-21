@@ -162,6 +162,8 @@ class network(object):
                 nb = 0
                 for events, target in tqdm(loader):
                     events = events.squeeze(0)
+                    print(target)
+                    print(output_path+f'{classes[target]}/{nb}')
                     if ts_batch_size and len(events)>ts_batch_size:
                         nb_batch = len(events)//ts_batch_size+1
                         for L in range(len(self.tau)):
