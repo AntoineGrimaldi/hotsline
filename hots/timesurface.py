@@ -43,6 +43,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
         all_surfaces = torch.zeros(
             (len(events), sensor_size[2], surface_dimensions[1],surface_dimensions[0])).to(device)
         events_list = events
+        
     for index, event in enumerate(events_list):
         x = int(event[x_index])
         y = int(event[y_index])
@@ -58,6 +59,11 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
             )
         else:
             timestamp_context = timestamp_memory - event[t_index]
+        
+        if all_surfaces[index, :, :, :].shape != timestamp_context.shape:
+            print(timestamp_context.shape)
+            print(x,y, surface_dimensions)
+            
 
         if decay == "lin":
             timesurface = timestamp_context / (5 * tau) + 1

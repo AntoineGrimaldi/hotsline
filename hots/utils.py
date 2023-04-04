@@ -289,9 +289,10 @@ def fit_mlr(loader,
             learning_rate,
             betas,
             num_epochs,
-            ts_size,
+            sensor_size,
             ordering,
             n_classes,
+            ts_size = None,
             ts_batch_size = None,
             drop_proba = None,
             device = 'cuda'):
@@ -305,7 +306,8 @@ def fit_mlr(loader,
             
         print(f'device -> {device}')
         
-        N = ts_size[0]*ts_size[1]*ts_size[2]
+        N = sensor_size[0]*sensor_size[1]*sensor_size[2]
+        if ts_size: N = ts_size[0]*ts_size[1]*sensor_size[2]
 
         classif_layer = mlrlayer(N, n_classes, device=device)
         classif_layer.train()
@@ -332,7 +334,7 @@ def fit_mlr(loader,
                     nb_batch = len(events)//ts_batch_size+1
                     previous_timestamp = []
                     for load_nb in range(nb_batch):
-                        X, ind_filtered, previous_timestamp = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, drop_proba = drop_proba, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                        X, ind_filtered, previous_timestamp = timesurface(events, (sensor_size[0], sensor_size[1], sensor_size[2]), ordering, tau = tau_cla, surface_dimensions = ts_size, ts_batch_size = ts_batch_size, drop_proba = drop_proba, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                         
                         n_events = X.shape[0]
 
@@ -353,7 +355,7 @@ def fit_mlr(loader,
                         torch.cuda.empty_cache()
                     
                 else:
-                    X, ind_filtered = timesurface(events, (ts_size[0], ts_size[1], ts_size[2]), ordering, tau = tau_cla, drop_proba = drop_proba, device = device)
+                    X, ind_filtered = timesurface(events, (sensor_size[0], sensor_size[1], sensor_size[2]), ordering, tau = tau_cla, surface_dimensions = ts_size, drop_proba = drop_proba, device = device)
                     X, label = X, label.to(device)
                     n_events = X.shape[0]
                     X = X.reshape(n_events, N)
@@ -392,8 +394,9 @@ def predict_mlr(mlrlayer,
                 tau_cla,
                 loader,
                 results_path,
-                timesurface_size,
+                sensor_size,
                 ordering,
+                ts_size = None,
                 save = True,
                 device = 'cuda',
                 ts_batch_size = None,
@@ -403,7 +406,8 @@ def predict_mlr(mlrlayer,
         with open(results_path, 'rb') as file:
             likelihood, true_target, timestamps = pickle.load(file)
     else:    
-        N = timesurface_size[0]*timesurface_size[1]*timesurface_size[2]
+        N = sensor_size[0]*sensor_size[1]*sensor_size[2]
+        if ts_size: N = ts_size[0]*ts_size[1]*sensor_size[2]
         t_index = ordering.index('t')
         
         initial_memory = copy.copy(torch.cuda.memory_allocated())
@@ -426,7 +430,7 @@ def predict_mlr(mlrlayer,
                     previous_timestamp = []
                     outputs = torch.Tensor([]).to(device)
                     for load_nb in range(nb_batch):
-                        X, ind_filtered, previous_timestamp = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                        X, ind_filtered, previous_timestamp = timesurface(events, (sensor_size[0], sensor_size[1], sensor_size[2]), ordering, tau = tau_cla, surface_dimensions = ts_size, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                         n_events = X.shape[0]
                         X, label = X, label.to(device)
                         X = X.reshape(n_events, N)
@@ -435,7 +439,7 @@ def predict_mlr(mlrlayer,
                         del X, outputs_splitted
                         torch.cuda.empty_cache()
                 else:
-                    X, ind_filtered = timesurface(events, (timesurface_size[0], timesurface_size[1], timesurface_size[2]), ordering, tau = tau_cla, device=device)
+                    X, ind_filtered = timesurface(events, (sensor_size[0], sensor_size[1], sensor_size[2]), ordering, tau = tau_cla, surface_dimensions = ts_size, device=device)
                     n_events = X.shape[0]
                     X, label = X, label.to(device)
                     X = X.reshape(n_events, N)
@@ -576,7 +580,7 @@ def online_accuracy(mlrlayer,
                 tau_cla,
                 loader,
                 results_path,
-                timesurface_size,
+                sensor_size,
                 ordering,
                 n_classes,
                 mlr_threshold = None,
@@ -587,10 +591,11 @@ def online_accuracy(mlrlayer,
                 figure_name = None,
                 save_likelihood = False,
                 device = 'cuda',
+                ts_size = None,
                 ts_batch_size = None,):
     onlinac_path = results_path[:-4]+f'_onlinac_{mlr_threshold}'
     if not os.path.exists(onlinac_path+'.npz'):
-        likelihood, true_target, timestamps = predict_mlr(mlrlayer, tau_cla, loader, results_path, timesurface_size, ordering, save=save_likelihood, device=device, ts_batch_size=ts_batch_size)
+        likelihood, true_target, timestamps = predict_mlr(mlrlayer, tau_cla, loader, results_path, sensor_size, ordering, save=save_likelihood, device=device, ts_size=ts_size, ts_batch_size=ts_batch_size)
         meanac, onlinac, lastac, best_probability, percentile_90, nb_no_decision = score_classif_events(likelihood, true_target, n_classes, thres=mlr_threshold)
         np.savez(onlinac_path, meanac, onlinac, lastac, best_probability, percentile_90, nb_no_decision)
     else: 
@@ -887,7 +892,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     
     return jitter_values, scores_jit, scores_jit_histo, scores_jit_histo_nohomeo
 
-def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_frames = 100, ts_batch_size = None, device = 'cuda'):
+def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_frames = 100, ts_batch_size = None, numev_threshold = None, device = 'cuda'):
     
     if os.path.exists(f'figures/{file_name}_{polarity}.gif'):
         return Image(filename=f'figures/{file_name}_{polarity}.gif')
@@ -903,7 +908,7 @@ def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_fr
             outputs = torch.Tensor([])
             ind_outputs = torch.Tensor([])
             for load_nb in tqdm(range(nb_batch)):
-                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, filtering_threshold = numev_threshold, device = device)
                 indices_batch = indices_of_frames[np.where((indices_of_frames>=load_nb*ts_batch_size)&(indices_of_frames<(load_nb+1)*ts_batch_size))[0]]
                 for event_indice in indices_batch-load_nb*ts_batch_size:
                     plt.imshow(all_ts[event_indice][0,:,:].cpu());
@@ -915,7 +920,7 @@ def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_fr
                 del all_ts
                 torch.cuda.empty_cache()
         else:
-            all_ts, ind_filtered = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, device = device)
+            all_ts, ind_filtered = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, filtering_threshold = numev_threshold, device = device)
             for event_indice in indices_of_frames:
                 plt.imshow(all_ts[event_indice][0,:,:].cpu());
                 plt.axis('off');
