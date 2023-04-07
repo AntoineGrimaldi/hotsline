@@ -423,8 +423,9 @@ def predict_mlr(mlrlayer,
             for events, label in tqdm(loader):
                 events = events.squeeze(0)
                 timestamps.append(events[:,t_index])
-                if events.shape[1]==0:
+                if events.shape[0]==0:
                     outputs = torch.Tensor([])
+                    print('sample without events')
                 elif ts_batch_size and len(events)>ts_batch_size:
                     nb_batch = len(events)//ts_batch_size+1
                     previous_timestamp = []

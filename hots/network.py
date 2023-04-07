@@ -157,9 +157,7 @@ class network(object):
                     events = events.squeeze(0)
                     if events.shape[0]==0: 
                         print('no event in this sample')
-                        break
-                    
-                    if ts_batch_size and len(events)>ts_batch_size:
+                    elif ts_batch_size and len(events)>ts_batch_size:
                         nb_batch = len(events)//ts_batch_size+1
                         for L in range(len(self.tau)):
                             previous_timestamp = []

@@ -3,6 +3,7 @@ import torch
 def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3, decay="exp", filtering_threshold = 1, drop_proba = None, ts_batch_size = None, load_number = None, previous_timestamp = [], device="cpu", dtype='torch.float32'):
     '''with tonic events is loaded in a standardized format: event -> (x,y,t,p) 
     '''
+    
     x_index = ordering.index('x')
     y_index = ordering.index('y')
     t_index = ordering.index('t')
