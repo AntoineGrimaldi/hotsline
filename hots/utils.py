@@ -87,7 +87,6 @@ def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_fi
         loader = torch.utils.data.DataLoader(sliced_dataset, shuffle=shuffle, num_workers = num_workers)
     return loader
 
-
 def get_properties(events, target, ind_sample, values, ordering = 'xytp', distinguish_polarities = False):
     t_index, p_index = ordering.index('t'), ordering.index('p')
     if distinguish_polarities: 
@@ -538,8 +537,9 @@ def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None
         pred_timestep = np.zeros(len(time_axis))
         pred_timestep[:] = np.nan
         for step in range(1,len(pred_timestep)):
-            indices = np.where((timestamps_.numpy()<=time_axis[step])&(timestamps_.numpy()>time_axis[step-1]))[0]
-            mean_likelihood = np.mean(likelihood_[indices,:],axis=0)
+            if time_axis[step]<timestamps_.numpy()[-2]:
+                indices = np.where((timestamps_.numpy()<time_axis[step])&(timestamps_.numpy()>=time_axis[step-1]))[0]
+                mean_likelihood = np.mean(likelihood_[indices,:],axis=0)
             if np.isnan(mean_likelihood).sum()>0:
                 pred_timestep[step] = np.nan
             else:
@@ -551,7 +551,6 @@ def score_classif_time(likelihood, true_target, timestamps, timestep, thres=None
                     pred_timestep[step] = np.nan
             if not np.isnan(pred_timestep[step]):
                 matscor[sample,step] = pred_timestep[step]==true_target_
-        
         lastev = -1
         while np.isnan(pred_timestep[lastev]):
             lastev -= 1
