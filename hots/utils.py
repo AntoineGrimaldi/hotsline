@@ -56,19 +56,13 @@ def get_sliced_loader(dataset, slicing_time_window, dataset_name, train, only_fi
     targets = dataset.targets
 
     metadata_path = f'{dataset.location_on_system}/metadata/{dataset_name}_{int(slicing_time_window*1e-3)}_{only_first}_{train}'
-    print(metadata_path)
-    
-    #print(only_first, slicing_time_window, transform, kfold, train, dataset_name)
 
     if only_first:
         slicer = tonic.slicers.SliceAtTimePoints(start_tw = [0], end_tw = [slicing_time_window])
     else:
         slicer = tonic.slicers.SliceByTime(time_window = slicing_time_window, include_incomplete = True)
-        
-    transform = None
 
-    sliced_dataset = tonic.SlicedDataset(dataset, transform = transform, slicer = slicer, metadata_path = metadata_path)
-    
+    sliced_dataset = tonic.SlicedDataset(dataset, slicer = slicer, metadata_path = metadata_path)
     classes = sliced_dataset.dataset.classes
     targets = sliced_dataset.dataset.targets
     
@@ -164,7 +158,7 @@ def get_dataset_info(trainset, testset=None, properties = ['mean_isi', 'synchron
             x = []
             for p in range(nb_pola):
                 x.append(values[value][p,:,:].sum(axis=1).ravel())
-                print(values[value][p,:,:].sum(axis=1).ravel())
+                #print(values[value][p,:,:].sum(axis=1).ravel())
             ttl = value
         elif distinguish_labels:
             x = []
