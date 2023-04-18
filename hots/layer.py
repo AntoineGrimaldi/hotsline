@@ -44,6 +44,7 @@ class hotslayer(torch.nn.Module):
             n_star = n_star[indices]
         else:
             indices = torch.arange(all_ts.shape[0])
+            
         return n_star, indices, beta
     
     
