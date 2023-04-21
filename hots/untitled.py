@@ -383,24 +383,28 @@ num_workers = 0
 learning_rate = 0.00005
 beta1, beta2 = 0.9, 0.999
 betas = (beta1, beta2)
-num_epochs = 2 ** 5 + 1
-sensor_size = (trainset.sensor_size[0],trainset.sensor_size[1],N_output_neurons)
+num_epochs = 5#2 ** 5 + 1
+sensor_size = (trainset.sensor_size[0]//4,trainset.sensor_size[1]//4,N_output_neurons)
 tau_cla = 5e3*N_neuronz[-1]
 drop_proba = .95
 
-ts_size = (31,31)
-ts_batch_size = int(1.3e4)
+ts_size = None#(31,31)
+ts_batch_size = int(1e4)
 
 model_path = f'../Records/networks/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
 results_path = f'../Records/LR_results/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
 print(model_path)
 
 drop_transform = tonic.transforms.DropEvent(p = drop_proba)
-kfold_mlr = None
+kfold_mlr = 10
 
 trainoutputloader = get_loader(trainset_output, kfold = kfold_mlr)
+testoutputloader = get_loader(testset_output, kfold = 2)
 
-classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, sensor_size, trainset.ordering, len(trainset.classes), ts_size = ts_size, ts_batch_size = ts_batch_size, drop_proba = drop_proba)
+print(sensor_size)
 
-mlr_threshold = None
-onlinac, best_probability, meanac, lastac = online_accuracy(classif_layer, tau_cla, testoutputloader, results_path, sensor_size, testset_output.ordering, n_classes, ts_size = ts_size, mlr_threshold = mlr_threshold, ts_batch_size = ts_batch_size, save_likelihood = False)
+for tau_cla in [int(1e3), int(5e3), int(1e4), int(5e4), int(1e5)]: 
+    classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, sensor_size, trainset.ordering, len(trainset.classes), ts_size = ts_size, ts_batch_size = ts_batch_size, drop_proba = drop_proba)
+
+    mlr_threshold = None
+    onlinac, best_probability, meanac, lastac = online_accuracy(classif_layer, tau_cla, testoutputloader, results_path, sensor_size, testset_output.ordering, n_classes, ts_size = ts_size, mlr_threshold = mlr_threshold, ts_batch_size = ts_batch_size, save_likelihood = False)
