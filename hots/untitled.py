@@ -306,6 +306,7 @@ for N_gpu in range(torch.cuda.device_count()):
     
 #record_path = '/envau/work/neopto/USERS/GRIMALDI/HOTS/hotsline/Records/'
 record_path = '../Records/'
+record_path = '/data/antoine/hotsline/Records/'
 
 device = 'cuda'
 
@@ -365,8 +366,8 @@ layer_threshold = None#[0.05, 0.1]
 hots.coding(trainloader, trainset.ordering, trainset.classes, layer_threshold = layer_threshold, training=True, ts_batch_size = ts_batch_size, verbose=False, device = device)
 hots.coding(testloader, trainset.ordering, trainset.classes, layer_threshold = layer_threshold, training=False, ts_batch_size = ts_batch_size, verbose=False, device = device)
 
-train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
-test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
+train_path = f'{record_path}output/train/{hots.name}_{num_sample_train}_{jitter}/'
+test_path = f'{record_path}output/test/{hots.name}_{num_sample_test}_{jitter}/'
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([type_transform]))
 trainoutputloader = get_loader(trainset_output)
@@ -391,8 +392,8 @@ drop_proba = .95
 ts_size = None#(31,31)
 ts_batch_size = int(1e4)
 
-model_path = f'../Records/networks/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
-results_path = f'../Records/LR_results/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
+model_path = f'{record_path}networks/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
+results_path = f'{record_path}LR_results/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
 print(model_path)
 
 drop_transform = tonic.transforms.DropEvent(p = drop_proba)
