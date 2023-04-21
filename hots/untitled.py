@@ -41,7 +41,7 @@ class network_pooling(object):
         self.n_pola = [nb_neurons[L] for L in range(nb_layers-1)]
         self.n_pola.insert(0,2)
         # pooling
-        self.channel_size = [(sensor_size[0]//(2*R[L]+1)+1, sensor_size[1]//(2*R[L]+1)+1) for L in range(nb_layers-1)]
+        self.channel_size = [(sensor_size[0]//(2*L), sensor_size[1]//(2*L)) for L in range(1,nb_layers)]
         self.channel_size.insert(0,(sensor_size[0], sensor_size[1]))
         self.tau = tau
         self.R = R
@@ -49,7 +49,7 @@ class network_pooling(object):
         
         # pooling
         for L in range(nb_layers):
-            assert (2*self.R[L]+1)**2 <= self.channel_size[L][0]*self.channel_size[L][1]
+            assert (2*(L+1))**2 <= self.channel_size[L][0]*self.channel_size[L][1]
         
         path = self.record_path+'networks/'+self.name+'.pkl'
         if os.path.exists(path):
@@ -87,17 +87,19 @@ class network_pooling(object):
                     events = events.squeeze(0)
                     if record:
                         previous_dic = [self.layers[L].synapses.weight.data.T.detach().clone() for L in range(len(self.tau))]
-                    if ts_batch_size and len(events)>ts_batch_size:
-                        nb_batch = len(events)//ts_batch_size+1
-                        for L in range(len(self.tau)):
+                    for L in range(len(self.tau)):
+                        ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
+                        nb_batch = len(events)//ts_batch_size_per_layer
+                        print(nb_batch, ts_batch_size_per_layer, len(events))
+                        if nb_batch:
                             previous_timestamp = []
                             outputs = torch.Tensor([])
                             ind_outputs = torch.Tensor([])
-                            for load_nb in range(nb_batch):
-                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                            for load_nb in range(nb_batch+1):
+                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                                 n_star, _, beta = self.layers[L](all_ts, True)
                                 outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
-                                ind_outputs = torch.hstack([ind_outputs,ind_filtered_timesurface+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_filtered_timesurface
+                                ind_outputs = torch.hstack([ind_outputs,ind_filtered_timesurface+load_nb*ts_batch_size_per_layer]) if ind_outputs.shape[0]>0 else ind_filtered_timesurface
                                 if record:
                                     proto_ts = all_ts.detach().clone()
                                     kernels = self.layers[L].synapses.weight.data.T
@@ -115,11 +117,7 @@ class network_pooling(object):
                                 torch.cuda.empty_cache()
                             events = events[ind_outputs,:]
                             events[:,p_index] = outputs.cpu()
-                            events[:,x_index] = torch.div(events[:,x_index], (2*self.R[L]+1), rounding_mode='floor')
-                            events[:,y_index] = torch.div(events[:,y_index], (2*self.R[L]+1), rounding_mode='floor')
-                            if events.shape[0]==0: break
-                    else:    
-                        for L in range(len(self.tau)):
+                        else:
                             all_ts, ind_filtered_timesurface = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
                             n_star, _, beta  = self.layers[L](all_ts, True)
                             if record:
@@ -137,12 +135,11 @@ class network_pooling(object):
                                 homeostasis.append((self.layers[L].cumhisto/self.layers[L].cumhisto.sum()-1/kernels.shape[1]).abs().mean().cpu())
                             del all_ts
                             torch.cuda.empty_cache()
-                            
                             events = events[ind_filtered_timesurface,:]
                             events[:,p_index] = n_star.cpu()
-                            events[:,x_index] = torch.div(events[:,x_index], (2*self.R[L]+1), rounding_mode='floor')
-                            events[:,y_index] = torch.div(events[:,y_index], (2*self.R[L]+1), rounding_mode='floor')
-                            if events.shape[0]==0: break
+                        events[:,x_index] = torch.div(events[:,x_index], (2*self.R[L]+1), rounding_mode='floor')
+                        events[:,y_index] = torch.div(events[:,y_index], (2*self.R[L]+1), rounding_mode='floor')
+                        if events.shape[0]==0: break
 
             with open(path, 'wb') as file:
                 pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
@@ -182,45 +179,40 @@ class network_pooling(object):
                 nb = 0
                 for events, target in tqdm(loader):
                     events = events.squeeze(0)
-                    if ts_batch_size and len(events)>ts_batch_size:
-                        nb_batch = len(events)//ts_batch_size+1
-                        for L in range(len(self.tau)):
+                    for L in range(len(self.tau)):
+                        ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
+                        nb_batch = len(events)//ts_batch_size_per_layer
+                        if nb_batch:
                             previous_timestamp = []
                             outputs = torch.Tensor([])
                             ind_outputs = torch.Tensor([])
-                            for load_nb in range(nb_batch):
-                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                            for load_nb in range(nb_batch+1):
+                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                                 n_star, ind_filtered_layer, beta = self.layers[L](all_ts, False)
                                 ind_to_keep = ind_filtered_timesurface[ind_filtered_layer]
                                 outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
-                                ind_outputs = torch.hstack([ind_outputs,ind_to_keep+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_to_keep
+                                ind_outputs = torch.hstack([ind_outputs,ind_to_keep+load_nb*ts_batch_size_per_layer]) if ind_outputs.shape[0]>0 else ind_to_keep
                                 del all_ts
                                 torch.cuda.empty_cache()
                             events = events[ind_outputs,:]
                             events[:,p_index] = outputs.cpu()
-                            events[:,x_index] = torch.div(events[:,x_index], (2*self.R[L]+1), rounding_mode='floor')
-                            events[:,y_index] = torch.div(events[:,y_index], (2*self.R[L]+1), rounding_mode='floor')
-                            if events.shape[0]==0: 
-                                complete_flag = False
-                                break
-                            else:
-                                complete_flag = True
-                    else:
-                        for L in range(len(self.tau)):
+                        else:
                             all_ts, ind_filtered_timesurface = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
                             n_star, ind_filtered_layer, beta = self.layers[L](all_ts, False)
                             events = events[ind_filtered_timesurface,:]
                             events[:,p_index] = n_star.cpu()
                             events = events[ind_filtered_layer,:]
-                            events[:,x_index] = torch.div(events[:,x_index], (2*self.R[L]+1), rounding_mode='floor')
-                            events[:,y_index] = torch.div(events[:,y_index], (2*self.R[L]+1), rounding_mode='floor')
                             del all_ts
                             torch.cuda.empty_cache()
-                            if events.shape[0]==0: 
-                                complete_flag = False
-                                break
-                            else:
-                                complete_flag = True
+                            
+                        events[:,x_index] = torch.div(events[:,x_index], (2*self.R[L]+1), rounding_mode='floor')
+                        events[:,y_index] = torch.div(events[:,y_index], (2*self.R[L]+1), rounding_mode='floor')
+                        if events.shape[0]==0: 
+                            complete_flag = False
+                            break
+                        else:
+                            complete_flag = True
+
                     if complete_flag:
                         np.save(output_path+f'{classes[target]}/{nb}', events)
                     nb+=1
@@ -276,13 +268,13 @@ class network_pooling(object):
     def plotlearning(self, width_fig = 30):
         path = self.record_path+'networks/'+self.name+'_recorded_parameters.pkl'
         with open(path, 'rb') as file:
-            loss, ent, delta_w, homeostasis = pickle.load(file)
+            loss, entropy, delta_w, homeostasis = pickle.load(file)
             
         n_layers = len(self.tau)
         fig, axs = plt.subplots(n_layers,4, figsize=(width_fig,n_layers*width_fig//4))
         for L in range(n_layers):
             loss_layer = loss[L::n_layers]
-            entropy_layer = ent[L::n_layers]
+            entropy_layer = entropy[L::n_layers]
             delta_w_layer = delta_w[L::n_layers]
             homeostasis_layer = homeostasis[L::n_layers]
             axs[L,0].plot(loss_layer)
@@ -306,7 +298,6 @@ for N_gpu in range(torch.cuda.device_count()):
     
 #record_path = '/envau/work/neopto/USERS/GRIMALDI/HOTS/hotsline/Records/'
 record_path = '../Records/'
-record_path = '/data/antoine/hotsline/Records/'
 
 device = 'cuda'
 
@@ -366,8 +357,8 @@ layer_threshold = None#[0.05, 0.1]
 hots.coding(trainloader, trainset.ordering, trainset.classes, layer_threshold = layer_threshold, training=True, ts_batch_size = ts_batch_size, verbose=False, device = device)
 hots.coding(testloader, trainset.ordering, trainset.classes, layer_threshold = layer_threshold, training=False, ts_batch_size = ts_batch_size, verbose=False, device = device)
 
-train_path = f'{record_path}output/train/{hots.name}_{num_sample_train}_{jitter}/'
-test_path = f'{record_path}output/test/{hots.name}_{num_sample_test}_{jitter}/'
+train_path = f'../Records/output/train/{hots.name}_{num_sample_train}_{jitter}/'
+test_path = f'../Records/output/test/{hots.name}_{num_sample_test}_{jitter}/'
 
 trainset_output = HOTS_Dataset(train_path, trainset.sensor_size, trainset.classes, dtype=trainset.dtype, transform=tonic.transforms.Compose([type_transform]))
 trainoutputloader = get_loader(trainset_output)
@@ -392,10 +383,6 @@ drop_proba = .95
 ts_size = None#(31,31)
 ts_batch_size = int(1e4)
 
-model_path = f'{record_path}networks/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
-results_path = f'{record_path}LR_results/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
-print(model_path)
-
 drop_transform = tonic.transforms.DropEvent(p = drop_proba)
 kfold_mlr = 10
 
@@ -404,7 +391,12 @@ testoutputloader = get_loader(testset_output, kfold = 2)
 
 print(sensor_size)
 
-for tau_cla in [int(1e3), int(5e3), int(1e4), int(5e4), int(1e5)]: 
+for tau_cla in [int(1e3), int(5e3), int(1e4), int(5e4), int(1e5)]:
+    
+    model_path = f'../Records/networks/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
+    results_path = f'../Records/LR_results/{hots.name}_conv_{tau_cla}_{learning_rate}_{betas}_{num_epochs}_{drop_proba}_{jitter}.pkl'
+    print(model_path)
+    
     classif_layer, losses = fit_mlr(trainoutputloader, model_path, tau_cla, learning_rate, betas, num_epochs, sensor_size, trainset.ordering, len(trainset.classes), ts_size = ts_size, ts_batch_size = ts_batch_size, drop_proba = drop_proba)
 
     mlr_threshold = None

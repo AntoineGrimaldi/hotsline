@@ -66,17 +66,18 @@ class network(object):
                     events = events.squeeze(0)
                     if record:
                         previous_dic = [self.layers[L].synapses.weight.data.T.detach().clone() for L in range(len(self.tau))]
-                    if ts_batch_size and len(events)>ts_batch_size:
-                        nb_batch = len(events)//ts_batch_size+1
-                        for L in range(len(self.tau)):
+                    for L in range(len(self.tau)):
+                        ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
+                        nb_batch = len(events)//ts_batch_size_per_layer
+                        if nb_batch:
                             previous_timestamp = []
                             outputs = torch.Tensor([])
                             ind_outputs = torch.Tensor([])
-                            for load_nb in range(nb_batch):
-                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
-                                n_star, _, _ = self.layers[L](all_ts, True)
+                            for load_nb in range(nb_batch+1):
+                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                                n_star, _, beta = self.layers[L](all_ts, True)
                                 outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
-                                ind_outputs = torch.hstack([ind_outputs,ind_filtered_timesurface+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_filtered_timesurface
+                                ind_outputs = torch.hstack([ind_outputs,ind_filtered_timesurface+load_nb*ts_batch_size_per_layer]) if ind_outputs.shape[0]>0 else ind_filtered_timesurface
                                 if record:
                                     proto_ts = all_ts.detach().clone()
                                     kernels = self.layers[L].synapses.weight.data.T
@@ -87,18 +88,16 @@ class network(object):
                                         DIFF += diff.mean()
                                     DIFF/=len(n_star)
                                     loss.append(DIFF.cpu())
-                                    entropy.append(entropy(kernels))
+                                    ent.append(entropy(kernels))
                                     delta_w.append((kernels-previous_dic[L]).abs().mean().cpu())
                                     homeostasis.append((self.layers[L].cumhisto/self.layers[L].cumhisto.sum()-1/kernels.shape[1]).abs().mean().cpu())
                                 del all_ts
                                 torch.cuda.empty_cache()
                             events = events[ind_outputs,:]
                             events[:,p_index] = outputs.cpu()
-                            if events.shape[0]==0: break
-                    else:    
-                        for L in range(len(self.tau)):
-                            all_ts, ind_filtered_timesurface = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
-                            n_star, _, _  = self.layers[L](all_ts, True)
+                        else:
+                            all_ts, ind_filtered_timesurface = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
+                            n_star, _, beta  = self.layers[L](all_ts, True)
                             if record:
                                 proto_ts = all_ts.detach().clone()
                                 kernels = self.layers[L].synapses.weight.data.T
@@ -109,15 +108,14 @@ class network(object):
                                     DIFF += diff.mean()
                                 DIFF/=len(n_star)
                                 loss.append(DIFF.cpu())
-                                entropy.append(entropy(kernels))
+                                ent.append(entropy(kernels))
                                 delta_w.append((kernels-previous_dic[L]).abs().mean().cpu())
                                 homeostasis.append((self.layers[L].cumhisto/self.layers[L].cumhisto.sum()-1/kernels.shape[1]).abs().mean().cpu())
                             del all_ts
                             torch.cuda.empty_cache()
-                            
                             events = events[ind_filtered_timesurface,:]
                             events[:,p_index] = n_star.cpu()
-                            if events.shape[0]==0: break
+                        if events.shape[0]==0: break
 
             with open(path, 'wb') as file:
                 pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
@@ -157,44 +155,41 @@ class network(object):
                     events = events.squeeze(0)
                     if events.shape[0]==0: 
                         print('no event in this sample')
-                    elif ts_batch_size and len(events)>ts_batch_size:
-                        nb_batch = len(events)//ts_batch_size+1
-                        for L in range(len(self.tau)):
-                            previous_timestamp = []
-                            outputs = torch.Tensor([])
-                            ind_outputs = torch.Tensor([])
-                            for load_nb in range(nb_batch):
-                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
-                                n_star, ind_filtered_layer, _ = self.layers[L](all_ts, False)
-                                ind_to_keep = ind_filtered_timesurface[ind_filtered_layer]
-                                outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
-                                ind_outputs = torch.hstack([ind_outputs,ind_to_keep+load_nb*ts_batch_size]) if ind_outputs.shape[0]>0 else ind_to_keep
-                                del all_ts
-                                torch.cuda.empty_cache()
-                            events = events[ind_outputs,:]
-                            events[:,p_index] = outputs.cpu()
-                            if events.shape[0]==0: 
-                                complete_flag = False
-                                break
-                            else:
-                                complete_flag = True
                     else:
                         for L in range(len(self.tau)):
-                            all_ts, ind_filtered_timesurface = timesurface(events, (self.sensor_size[0], self.sensor_size[1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
-                            n_star, ind_filtered_layer, _ = self.layers[L](all_ts, False)
-                            events = events[ind_filtered_timesurface,:]
-                            events[:,p_index] = n_star.cpu()
-                            events = events[ind_filtered_layer,:]
-                            del all_ts
-                            torch.cuda.empty_cache()
+                            ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
+                            nb_batch = len(events)//ts_batch_size_per_layer
+                            if nb_batch:
+                                previous_timestamp = []
+                                outputs = torch.Tensor([])
+                                ind_outputs = torch.Tensor([])
+                                for load_nb in range(nb_batch+1):
+                                    all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                                    n_star, ind_filtered_layer, beta = self.layers[L](all_ts, False)
+                                    ind_to_keep = ind_filtered_timesurface[ind_filtered_layer]
+                                    outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
+                                    ind_outputs = torch.hstack([ind_outputs,ind_to_keep+load_nb*ts_batch_size_per_layer]) if ind_outputs.shape[0]>0 else ind_to_keep
+                                    del all_ts
+                                    torch.cuda.empty_cache()
+                                events = events[ind_outputs,:]
+                                events[:,p_index] = outputs.cpu()
+                            else:
+                                all_ts, ind_filtered_timesurface = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
+                                n_star, ind_filtered_layer, beta = self.layers[L](all_ts, False)
+                                events = events[ind_filtered_timesurface,:]
+                                events[:,p_index] = n_star.cpu()
+                                events = events[ind_filtered_layer,:]
+                                del all_ts
+                                torch.cuda.empty_cache()
                             if events.shape[0]==0: 
                                 complete_flag = False
                                 break
                             else:
                                 complete_flag = True
-                    if complete_flag:
-                        np.save(output_path+f'{classes[target]}/{nb}', events)
-                    nb+=1
+
+                        if complete_flag:
+                            np.save(output_path+f'{classes[target]}/{nb}', events)
+                        nb+=1
                     
                     
     def plotlayers(self, maxpol=None, hisiz=2, yhis=0.3):
