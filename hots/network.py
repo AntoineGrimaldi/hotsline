@@ -74,7 +74,7 @@ class network(object):
                             outputs = torch.Tensor([])
                             ind_outputs = torch.Tensor([])
                             for load_nb in range(nb_batch+1):
-                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                                all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.sensor_size[L][0], self.sensor_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                                 n_star, _, beta = self.layers[L](all_ts, True)
                                 outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
                                 ind_outputs = torch.hstack([ind_outputs,ind_filtered_timesurface+load_nb*ts_batch_size_per_layer]) if ind_outputs.shape[0]>0 else ind_filtered_timesurface
@@ -96,7 +96,7 @@ class network(object):
                             events = events[ind_outputs,:]
                             events[:,p_index] = outputs.cpu()
                         else:
-                            all_ts, ind_filtered_timesurface = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
+                            all_ts, ind_filtered_timesurface = timesurface(events, (self.sensor_size[L][0], self.sensor_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
                             n_star, _, beta  = self.layers[L](all_ts, True)
                             if record:
                                 proto_ts = all_ts.detach().clone()
@@ -164,7 +164,7 @@ class network(object):
                                 outputs = torch.Tensor([])
                                 ind_outputs = torch.Tensor([])
                                 for load_nb in range(nb_batch+1):
-                                    all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
+                                    all_ts, ind_filtered_timesurface, previous_timestamp = timesurface(events, (self.sensor_size[L][0], self.sensor_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], ts_batch_size = ts_batch_size_per_layer, load_number = load_nb, previous_timestamp = previous_timestamp, device = device)
                                     n_star, ind_filtered_layer, beta = self.layers[L](all_ts, False)
                                     ind_to_keep = ind_filtered_timesurface[ind_filtered_layer]
                                     outputs = torch.hstack([outputs,n_star]) if outputs.shape[0]>0 else n_star
@@ -174,7 +174,7 @@ class network(object):
                                 events = events[ind_outputs,:]
                                 events[:,p_index] = outputs.cpu()
                             else:
-                                all_ts, ind_filtered_timesurface = timesurface(events, (self.channel_size[L][0], self.channel_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
+                                all_ts, ind_filtered_timesurface = timesurface(events, (self.sensor_size[L][0], self.sensor_size[L][1], self.n_pola[L]), ordering, tau = self.tau[L], surface_dimensions=[2*self.R[L]+1,2*self.R[L]+1], filtering_threshold = filtering_threshold[L], device=device)
                                 n_star, ind_filtered_layer, beta = self.layers[L](all_ts, False)
                                 events = events[ind_filtered_timesurface,:]
                                 events[:,p_index] = n_star.cpu()

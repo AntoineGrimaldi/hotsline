@@ -935,5 +935,12 @@ def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_fr
         return Image(filename=f'figures/{file_name}_{polarity}.gif')
     
     
+def plot_kernels(classif_layer, N_output_neurons, sensor_size):
+    kernels = classif_layer.linear.weight.data.cpu().numpy()
+    fig, ax = plt.subplots(N_output_neurons, kernels.shape[0], figsize=(30, 90))
+    for n in range(kernels.shape[0]):
+        kernel = kernels[n].reshape(sensor_size[0],sensor_size[1], N_output_neurons)
+        for p in range(N_output_neurons):
+            ax[p, n].imshow(kernel[:,:,p])
 
 
