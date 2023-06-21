@@ -686,7 +686,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
             score_stat[1,i] = np.mean(score[:,i])
 
     if fitting:
-        Rmax,Rmin,semisat,powa = fit_NR(jit,score_stat[1,:],init_params=param)
+        Rmin,Rmax,semisat,powa = fit_NR(jit,score_stat[1,:],init_params=param)
         if logscale:
             jitter_cont = np.logspace(np.min(np.log10(jit)),np.max(np.log10(jit)),100) 
             nr_fit = NR_jitter(jitter_cont,Rmax,Rmin,semisat, powa)
@@ -705,8 +705,7 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
     if fitting:
         halfsat = (Rmax-Rmin)/2+Rmin
         ind_halfsat = np.where(nr_fit<halfsat)[0]
-        #print(len(ind_halfsat))
-        #x_halfsat = jitter_cont[ind_halfsat[0]]
+        x_halfsat = jitter_cont[ind_halfsat[0]]
     return fig, ax, x_halfsat
 
 def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, ts_batch_size = None, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, slicing_time_window = 1e6, device = 'cuda', fitting = True, figure_name = None, verbose = False):
@@ -722,7 +721,6 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     ts_size = [trainset_output.sensor_size[0],trainset_output.sensor_size[1],n_output_neurons]
     
     type_transform = tonic.transforms.NumpyAsType(int)
-    
     if not os.path.exists(hots.record_path+'jitter_results/'):
         os.mkdir(hots.record_path+'jitter_results/')
     if jitter_type=='temporal':
@@ -852,7 +850,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     fig_t, ax_t = plt.subplots(1,1,figsize=(8,5))
     colorz = ['#2ca02c','#1f77b4','#d62728']
     label = 'online HOTS (ours)'
-    param_T = [.99, 1/n_classes, 4, .5] # to change to adjust the fit
+    param_T = [.99, 1/n_classes, 4, .6] # to change to adjust the fit
     n_epoch = 33
 
     fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit, param = param_T, color=colorz[1], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)

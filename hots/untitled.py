@@ -88,9 +88,10 @@ class network_pooling(object):
                     if record:
                         previous_dic = [self.layers[L].synapses.weight.data.T.detach().clone() for L in range(len(self.tau))]
                     for L in range(len(self.tau)):
-                        ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
-                        nb_batch = len(events)//ts_batch_size_per_layer
-                        print(nb_batch, ts_batch_size_per_layer, len(events))
+                        if ts_batch_size: 
+                            ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
+                            nb_batch = len(events)//ts_batch_size_per_layer
+                        else: nb_batch = 0
                         if nb_batch:
                             previous_timestamp = []
                             outputs = torch.Tensor([])
@@ -180,8 +181,10 @@ class network_pooling(object):
                 for events, target in tqdm(loader):
                     events = events.squeeze(0)
                     for L in range(len(self.tau)):
-                        ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
-                        nb_batch = len(events)//ts_batch_size_per_layer
+                        if ts_batch_size:
+                            ts_batch_size_per_layer = int(ts_batch_size*(self.n_pola[0]*(2*self.R[0]+1)**2)/(self.n_pola[L]*(2*self.R[L]+1)**2))
+                            nb_batch = len(events)//ts_batch_size_per_layer
+                        else: nb_batch = 0
                         if nb_batch:
                             previous_timestamp = []
                             outputs = torch.Tensor([])
@@ -287,9 +290,7 @@ class network_pooling(object):
                 axs[L,2].set_title('average gradient of the weights')
                 axs[L,3].set_title('average homeostasic gain')
         plt.show()
-
-
-
+        
 print(f'Tonic version installed -> {tonic.__version__}')
 
 print(f'Number of GPU devices available: {torch.cuda.device_count()}')
@@ -306,7 +307,7 @@ kfold_clust = 10
 ts_batch_size = int(1e5)
 
 dataset_name = 'gesture'
-slicing_time_window = 2e6
+slicing_time_window = 3e6
 only_first = True
 
 #to uncomment 
@@ -330,7 +331,7 @@ print(f'number of samples in the testing set: {len(testloader)}')
 
 name = 'homeohots_pool'
 homeo = True
-timestr = '2023-04-14'
+timestr = '2023-05-23'
 dataset_name = 'gesture'
 
 Rz = [2, 2]
@@ -381,7 +382,7 @@ tau_cla = 5e3*N_neuronz[-1]
 drop_proba = .95
 
 ts_size = None#(31,31)
-ts_batch_size = int(1e5)
+ts_batch_size = int(2e5)
 
 drop_transform = tonic.transforms.DropEvent(p = drop_proba)
 kfold_mlr = None
