@@ -428,6 +428,7 @@ def predict_mlr(mlrlayer,
                         n_events = X.shape[0]
                         X, label = X, label.to(device)
                         X = X.reshape(n_events, N)
+                        print(ts_batch_size, X.shape, nb_batch, load_nb)
                         outputs_splitted = classif_layer(X.double())
                         outputs = torch.vstack([outputs,outputs_splitted]) if outputs.shape[0]>0 else outputs_splitted
                         del X, outputs_splitted
@@ -775,6 +776,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                     hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, device = device, verbose=False)
                 if dataset_name=='gesture':
                     testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform_full)
+                    print(testset.location_on_system)
                     testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, only_first=True, kfold=kfold)
                     hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
                     hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
@@ -783,7 +785,6 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                 num_sample_test = len(testloader)
 
                 test_path = hots.record_path+f'output/test/{hots.name}_{num_sample_test}_{jitter}/'
-                print(test_path)
                 results_path = hots.record_path+f'LR_results/{hots.name}_{tau_cla}_{num_sample_test}_{learning_rate}_{betas}_{num_epochs}_{drop_proba_mlr}_{jitter}.pkl'
                 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
@@ -794,6 +795,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                     shutil.rmtree(test_path)
                     #testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform_full)
                     #testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, only_first=True, kfold=kfold)
+                    events, label = next(iter(testloader))
                     hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
                 
                 testset_output = HOTS_Dataset(test_path, trainset_output.sensor_size, trainset_output.classes, dtype=trainset_output.dtype, transform=type_transform)
@@ -913,6 +915,7 @@ def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_fr
                 torch.cuda.empty_cache()
         else:
             all_ts, ind_filtered = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, filtering_threshold = numev_threshold, device = device)
+            
             for event_indice in indices_of_frames:
                 plt.imshow(all_ts[event_indice][0,:,:].cpu());
                 plt.axis('off');
