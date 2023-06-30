@@ -916,7 +916,7 @@ def make_and_display_ts(events, file_name, trainset, tau, polarity= 'off', nb_fr
         else:
             all_ts, ind_filtered = timesurface(events, trainset.sensor_size, trainset.ordering, tau = tau, filtering_threshold = numev_threshold, device = device)
             
-            for event_indice in indices_of_frames:
+            for event_indice in tqdm(indices_of_frames):
                 plt.imshow(all_ts[event_indice][0,:,:].cpu());
                 plt.axis('off');
                 plt.savefig(f'figures/ts_off_{file_name}_{event_indice}');
