@@ -650,7 +650,6 @@ def online_accuracy(mlrlayer,
             printfig(fig, figure_name)
     
     return onlinac, best_probability, meanac, lastac
-    
 
 def NR_jitter(jitter,Rmax,Rmin,jitter0,powa): 
     x = jitter**powa
@@ -660,8 +659,8 @@ def NR_jitter(jitter,Rmax,Rmin,jitter0,powa):
 
 def fit_NR(jitter,accuracy,init_params=[1,1/10,1e4,2]):
     popt, pcov = curve_fit(NR_jitter, jitter, accuracy, p0 = init_params)
-    Rmin = popt[0]
-    Rmax = popt[1]
+    Rmax = popt[0]
+    Rmin = popt[1]
     semisat = popt[2]
     powa = popt[3]
     return Rmin,Rmax,semisat,powa
@@ -672,7 +671,6 @@ def pf(x, alpha, beta):
 def fit_PF(event_nb, success, init_params=[100., 1.]):
     par, mcov = curve_fit(pf, event_nb, success, p0 = init_params)
     return par[0], par[1]
-
 
 def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', label='name', nb_class=10, n_epo = 33, fitting = True, logscale = False):
     score_stat = np.zeros([3,len(jit)])
@@ -704,12 +702,13 @@ def plotjitter(fig, ax, jit, score, param = [0.8, 22, 4, 0.1], color='red', labe
         
     x_halfsat = []
     if fitting:
-        halfsat = (Rmax-Rmin)/2+Rmin
-        ind_halfsat = np.where(nr_fit<halfsat)[0]
-        x_halfsat = jitter_cont[ind_halfsat[0]]
+        halfsat = (Rmax-1/nb_class)/2+1/nb_class
+        if halfsat>nr_fit[-1]:
+            ind_halfsat = np.where(nr_fit<halfsat)[0]
+            x_halfsat = jitter_cont[ind_halfsat[0]]
     return fig, ax, x_halfsat
 
-def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, ts_batch_size = None, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, slicing_time_window = 1e6, device = 'cuda', fitting = True, figure_name = None, verbose = False):
+def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classif_layer, tau_cla, dataset_name, trainset_output, trainset_output_nohomeo, learning_rate, betas, num_epochs, ts_batch_size = None, drop_proba_mlr = None, filtering_threshold = None, kfold = None, nb_trials = 10, nb_points = 20, mlr_threshold = None, slicing_time_window = 1e6, device = 'cuda', fitting = True, fit_param = None, figure_name = None, verbose = False):
     
     save_likelihood = False
     print(f'device -> {device}')
@@ -852,22 +851,25 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
     fig_t, ax_t = plt.subplots(1,1,figsize=(8,5))
     colorz = ['#2ca02c','#1f77b4','#d62728']
     label = 'online HOTS (ours)'
-    param_T = [.99, 1/n_classes, 4, .6] # to change to adjust the fit
+    if fit_param is not None: 
+        param_1, param_2, param_3 = fit_param
+    else:
+        param_1 = [.9, 1/n_classes, 2, 2] # to change to adjust the fit
+        param_2 = [.9, 1/n_classes, 2, 2]
+        param_3 = [.9, 1/n_classes, 2, 2]
     n_epoch = 33
 
-    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit, param = param_T, color=colorz[1], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)
+    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit, param = param_1, color=colorz[1], label=label, nb_class=n_classes, n_epo=n_epoch, fitting = fitting, logscale=logscale)
     if fitting:
         print(f'semi saturation level for {label}: {np.round(semisat_t,2)} ms')
 
     label = 'HOTS with homeostasis'
-    param_T = [.95, 1/n_classes, 8, .1] # to change to adjust the fit
-    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit_histo, param = param_T, color=colorz[0], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)
+    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit_histo, param = param_2, color=colorz[0], label=label, nb_class=n_classes, n_epo=n_epoch, fitting = fitting, logscale=logscale)
     if fitting:
         print(f'semi saturation level for {label}: {np.round(semisat_t,2)} ms')
 
     label = 'original HOTS'
-    param_T = [.95,1/n_classes, 2, 2] # to change to adjust the fit
-    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit_histo_nohomeo, param = param_T, color=colorz[2], label=label, n_epo=n_epoch, fitting = fitting, logscale=logscale)
+    fig_t, ax_t, semisat_t = plotjitter(fig_t, ax_t, jitter_values, scores_jit_histo_nohomeo, param = param_3, color=colorz[2], label=label, nb_class=n_classes, n_epo=n_epoch, fitting = fitting, logscale=logscale)
     if fitting:
         print(f'semi saturation level for {label}: {np.round(semisat_t,2)} ms')
 
