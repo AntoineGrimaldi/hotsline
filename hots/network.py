@@ -68,7 +68,7 @@ class network(object):
                 self.layers[L].cumhisto = self.layers[L].cumhisto.to(device)
             
             if record:
-                entropy = []
+                ent = []
                 loss = []
                 delta_w = []
                 homeostasis = []
@@ -268,17 +268,17 @@ class network(object):
     def plotlearning(self, width_fig = 30):
         path = self.record_path+'networks/'+self.name+'_recorded_parameters.pkl'
         with open(path, 'rb') as file:
-            loss, entropy, delta_w, homeostasis = pickle.load(file)
+            loss, ent, delta_w, homeostasis = pickle.load(file)
             
         n_layers = len(self.tau)
         fig, axs = plt.subplots(n_layers,4, figsize=(width_fig,n_layers*width_fig//4))
         for L in range(n_layers):
             loss_layer = loss[L::n_layers]
-            entropy_layer = entropy[L::n_layers]
+            #entropy_layer = ent[L::n_layers]
             delta_w_layer = delta_w[L::n_layers]
             homeostasis_layer = homeostasis[L::n_layers]
             axs[L,0].plot(loss_layer)
-            axs[L,1].plot(entropy_layer)
+            #axs[L,1].plot(entropy_layer)
             axs[L,2].plot(delta_w_layer)
             axs[L,3].plot(homeostasis_layer)
             if L == 0:
@@ -547,11 +547,11 @@ class network_pooling(object):
         fig, axs = plt.subplots(n_layers,4, figsize=(width_fig,n_layers*width_fig//4))
         for L in range(n_layers):
             loss_layer = loss[L::n_layers]
-            entropy_layer = entropy[L::n_layers]
+            #entropy_layer = entropy[L::n_layers]
             delta_w_layer = delta_w[L::n_layers]
             homeostasis_layer = homeostasis[L::n_layers]
             axs[L,0].plot(loss_layer)
-            axs[L,1].plot(entropy_layer)
+            #axs[L,1].plot(entropy_layer)
             axs[L,2].plot(delta_w_layer)
             axs[L,3].plot(homeostasis_layer)
             if L == 0:

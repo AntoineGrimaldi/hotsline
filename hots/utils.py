@@ -759,7 +759,7 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                     temporal_jitter_transform = tonic.transforms.TimeJitter(std = jitter_val, clip_negative = True, sort_timestamps = True)
                     transform_full = tonic.transforms.Compose([temporal_jitter_transform, type_transform])
                 else:
-                    spatial_jitter_transform = tonic.transforms.SpatialJitter(sensor_size = trainset_output.sensor_size, variance_x = jitter_val, variance_y = jitter_val, clip_outliers = True)
+                    spatial_jitter_transform = tonic.transforms.SpatialJitter(sensor_size = trainset_output.sensor_size, var_x = jitter_val, var_y = jitter_val, clip_outliers = True)
                     transform_full = tonic.transforms.Compose([spatial_jitter_transform, type_transform])
 
                 if dataset_name=='poker':
