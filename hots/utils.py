@@ -428,7 +428,6 @@ def predict_mlr(mlrlayer,
                         n_events = X.shape[0]
                         X, label = X, label.to(device)
                         X = X.reshape(n_events, N)
-                        print(ts_batch_size, X.shape, nb_batch, load_nb)
                         outputs_splitted = classif_layer(X.double())
                         outputs = torch.vstack([outputs,outputs_splitted]) if outputs.shape[0]>0 else outputs_splitted
                         del X, outputs_splitted
@@ -775,7 +774,6 @@ def apply_jitter(min_jitter, max_jitter, jitter_type, hots, hots_nohomeo, classi
                     hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, device = device, verbose=False)
                 if dataset_name=='gesture':
                     testset = tonic.datasets.DVSGesture(save_to='../../Data/', train=False, transform=transform_full)
-                    print(testset.location_on_system)
                     testloader = get_sliced_loader(testset, slicing_time_window, dataset_name, False, only_first=True, kfold=kfold)
                     hots.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter = jitter, filtering_threshold = filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)
                     hots_nohomeo.coding(testloader, trainset_output.ordering, testset.classes, training=False, jitter=jitter, filtering_threshold=filtering_threshold, ts_batch_size=ts_batch_size, device = device, verbose=False)

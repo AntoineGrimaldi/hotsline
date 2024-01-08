@@ -33,6 +33,7 @@ def timesurface(events, sensor_size, ordering, surface_dimensions=None, tau=5e3,
             timestamp_memory = previous_timestamp
         else:
             timestamp_memory -= tau * 5 + 1
+            
         all_surfaces = torch.zeros(
             (ts_batch_size, sensor_size[2], surface_dimensions[1],surface_dimensions[0])).to(device)
 
